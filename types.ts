@@ -10,13 +10,28 @@ export enum CardType {
   WILD = 'WILD', // Mirror
 }
 
-export interface Card {
+export type Rarity = 'Comum' | 'Rara' | 'Épica' | 'Lendária';
+
+export interface CardDefinition {
   id: string;
   type: CardType;
-  color: CardColor;
-  value?: number; // For type NUMBER
+  baseColor: CardColor;
+  value?: number;
   label: string;
-  imageUrl: string;
+  rarity: Rarity;
+  description: string;
+}
+
+export interface CardInstance {
+  cardId: string;
+  level: number;
+  count: number;
+}
+
+export interface Card extends CardDefinition {
+  // Versão estendida usada durante a partida (contendo IDs únicos de instância)
+  instanceId: string;
+  color: CardColor;
 }
 
 export interface Player {
@@ -35,7 +50,8 @@ export interface UserProfile {
   level: number;
   trophies: number;
   currentArena: number;
-  unlockedCards: string[];
+  collection: CardInstance[];
+  activeDeck: string[]; // IDs das 8 cartas selecionadas
 }
 
 export enum GameStatus {

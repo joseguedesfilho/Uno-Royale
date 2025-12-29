@@ -6,18 +6,19 @@ interface ClashCardProps {
   card: Card;
   onClick?: () => void;
   playable?: boolean;
+  selected?: boolean;
   size?: 'sm' | 'md' | 'lg';
   hidden?: boolean;
 }
 
-const ClashCard: React.FC<ClashCardProps> = ({ card, onClick, playable, size = 'md', hidden }) => {
+const ClashCard: React.FC<ClashCardProps> = ({ card, onClick, playable, selected, size = 'md', hidden }) => {
   const getBgColor = (color: CardColor) => {
     switch (color) {
-      case 'Red': return 'bg-[#eb2739]'; // Vermelho UNO
-      case 'Blue': return 'bg-[#3558a7]'; // Azul UNO
-      case 'Yellow': return 'bg-[#f7da21]'; // Amarelo UNO
-      case 'Green': return 'bg-[#3aa948]'; // Verde UNO
-      default: return 'bg-[#111111]'; // Preto para Wild
+      case 'Red': return 'bg-[#eb2739]';
+      case 'Blue': return 'bg-[#3558a7]';
+      case 'Yellow': return 'bg-[#f7da21]';
+      case 'Green': return 'bg-[#3aa948]';
+      default: return 'bg-[#111111]';
     }
   };
 
@@ -50,9 +51,11 @@ const ClashCard: React.FC<ClashCardProps> = ({ card, onClick, playable, size = '
     lg: 'w-28 h-44 text-base'
   }[size];
 
+  const isLegendary = card.rarity === 'Lendária';
+
   if (hidden) {
     return (
-      <div className={`${dims} bg-black rounded-xl border-4 border-white flex items-center justify-center shadow-xl relative overflow-hidden`}>
+      <div className={`${dims} bg-black rounded-xl border-4 border-white flex items-center justify-center relative overflow-hidden`}>
          <div className="w-[85%] h-[85%] flex items-center justify-center border-[6px] border-[#eb2739] rounded-lg">
             <span className="text-white font-black text-2xl italic scale-y-150">UNO</span>
          </div>
@@ -64,33 +67,36 @@ const ClashCard: React.FC<ClashCardProps> = ({ card, onClick, playable, size = '
 
   return (
     <div 
-      onClick={playable ? onClick : undefined}
+      onClick={onClick}
       className={`
         ${dims} 
         ${getBgColor(card.color)}
         rounded-xl border-[4px] border-white
-        flex flex-col items-center justify-center shadow-2xl cursor-pointer
-        transition-all transform hover:-translate-y-8 active:scale-95
+        flex flex-col items-center justify-center cursor-pointer
+        transition-all transform active:scale-95
         relative overflow-hidden
-        ${playable ? 'ring-[6px] ring-yellow-400 z-10 scale-105' : ''}
+        ${selected ? 'border-blue-400 -translate-y-12 z-20 shadow-[0_0_20px_rgba(59,130,246,0.5)]' : 'hover:-translate-y-4'}
+        ${playable && !selected ? 'border-yellow-400' : ''}
+        ${isLegendary ? 'animate-pulse ring-2 ring-yellow-400 ring-offset-2 ring-offset-transparent' : ''}
       `}
     >
-      {/* Elipse Branca Central - Característica do UNO */}
-      <div className="absolute w-[130%] h-[75%] bg-white rounded-[100%] rotate-[-28deg] shadow-[inset_0_0_15px_rgba(0,0,0,0.1)] flex items-center justify-center">
-         <span className={`font-black italic ${size === 'lg' ? 'text-7xl' : size === 'md' ? 'text-5xl' : 'text-3xl'} ${getTextColor(card.color)} drop-shadow-md rotate-[28deg] scale-y-110 tracking-tighter`}>
+      <div className="absolute w-[130%] h-[75%] bg-white rounded-[100%] rotate-[-28deg] flex items-center justify-center">
+         <span className={`font-black italic ${size === 'lg' ? 'text-7xl' : size === 'md' ? 'text-5xl' : 'text-3xl'} ${getTextColor(card.color)} rotate-[28deg] scale-y-110 tracking-tighter`}>
             {symbol}
          </span>
       </div>
 
-      {/* Símbolos dos Cantos */}
-      <div className="absolute top-1 left-1.5 font-black text-white italic text-base drop-shadow-md">
+      <div className="absolute top-1 left-1.5 font-black text-white italic text-base">
         {symbol}
       </div>
-      <div className="absolute bottom-1 right-1.5 font-black text-white italic text-base drop-shadow-md rotate-180">
+      <div className="absolute bottom-1 right-1.5 font-black text-white italic text-base rotate-180">
         {symbol}
       </div>
 
-      {/* Detalhe de Coringa (Quatro Cores) */}
+      {isLegendary && (
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/30 to-transparent -translate-x-full animate-[shimmer_2s_infinite] pointer-events-none"></div>
+      )}
+
       {card.color === 'Wild' && (
         <div className="absolute inset-0 flex flex-wrap opacity-40 pointer-events-none">
            <div className="w-1/2 h-1/2 bg-[#eb2739]"></div>

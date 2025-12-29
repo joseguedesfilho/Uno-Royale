@@ -1,5 +1,5 @@
 
-import { ArenaTheme, CardType, CardColor, Card } from './types';
+import { ArenaTheme, CardType, CardColor, CardDefinition } from './types';
 
 export const ARENAS: ArenaTheme[] = [
   { name: 'Campo de Treino', bots: 1, minTrophies: 0, bgColor: 'bg-green-800', banner: 'https://picsum.photos/seed/arena1/800/400' },
@@ -14,15 +14,25 @@ export const ARENAS: ArenaTheme[] = [
   { name: 'Arena Lendária', bots: 10, minTrophies: 3000, bgColor: 'bg-slate-900', banner: 'https://picsum.photos/seed/arena10/800/400' },
 ];
 
-export const CARD_MAPPING = {
-  [CardType.SKIP]: { label: 'Gelo', img: '❄️' },
-  [CardType.REVERSE]: { label: 'O Tronco', img: '🪵' },
-  [CardType.DRAW2]: { label: 'Fúria', img: '🧪' },
-  [CardType.DRAW4]: { label: 'Exército de Esqueletos', img: '💀' },
-  [CardType.WILD]: { label: 'Espelho', img: '🪞' },
-};
+export const ALL_CARDS: CardDefinition[] = [
+  // Tropas (Números)
+  ...[0,1,2,3,4,5,6,7,8,9].map(n => ({
+    id: `num-${n}`,
+    type: CardType.NUMBER,
+    baseColor: 'Blue' as CardColor,
+    value: n,
+    label: n === 0 ? 'Espírito de Gelo' : n === 7 ? 'Gigante Royale' : `Tropa ${n}`,
+    rarity: n > 7 ? 'Rara' : 'Comum' as any,
+    description: `Uma tropa básica de valor ${n}.`
+  })),
+  // Feitiços
+  { id: 'spell-freeze', type: CardType.SKIP, baseColor: 'Blue', label: 'Gelo', rarity: 'Épica', description: 'Congela o turno do próximo jogador.' },
+  { id: 'spell-log', type: CardType.REVERSE, baseColor: 'Red', label: 'O Tronco', rarity: 'Lendária', description: 'Inverte a direção da partida.' },
+  { id: 'spell-rage', type: CardType.DRAW2, baseColor: 'Yellow', label: 'Fúria', rarity: 'Rara', description: 'Faz o próximo jogador comprar 2 cartas.' },
+  { id: 'spell-skarmy', type: CardType.DRAW4, baseColor: 'Wild', label: 'Exército de Esq.', rarity: 'Épica', description: 'Faz o próximo comprar 4 cartas e muda a cor.' },
+  { id: 'spell-mirror', type: CardType.WILD, baseColor: 'Wild', label: 'Espelho', rarity: 'Lendária', description: 'Muda a cor atual para qualquer uma.' },
+];
 
 export const COLORS: CardColor[] = ['Red', 'Blue', 'Yellow', 'Green'];
-
-export const INITIAL_GOLD = 500;
-export const INITIAL_GEMS = 50;
+export const INITIAL_GOLD = 1000;
+export const INITIAL_GEMS = 100;
