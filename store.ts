@@ -177,21 +177,39 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { profile } = get();
     if (!profile) return;
     
+    let hasChanges = false;
     const newQuests = profile.quests.map(q => {
       if (q.isClaimed) return q;
-      if (event.type === 'PLAY_CARD' && q.description.includes(event.color || '')) {
-         return { ...q, current: Math.min(q.target, q.current + 1) };
+      let newCurrent = q.current;
+      
+      const desc = q.description.toLowerCase();
+      if (event.type === 'PLAY_CARD' && event.color && desc.includes(event.color.toLowerCase())) {
+         newCurrent = Math.min(q.target, q.current + 1);
       }
-      if (event.type === 'WIN_MATCH' && q.description.includes('Vença')) {
-         return { ...q, current: Math.min(q.target, q.current + 1) };
+      if (event.type === 'WIN_MATCH' && desc.includes('vença')) {
+         newCurrent = Math.min(q.target, q.current + 1);
       }
-      if (event.type === 'ARENA_PLAY' && q.description.includes(`Arena ${event.arena}`)) {
-         return { ...q, current: Math.min(q.target, q.current + 1) };
+      if (event.type === 'ARENA_PLAY' && event.arena !== undefined && desc.includes(`arena ${event.arena}`)) {
+         newCurrent = Math.min(q.target, q.current + 1);
+      }
+      
+      if (newCurrent !== q.current) {
+        hasChanges = true;
+        return { ...q, current: newCurrent };
       }
       return q;
     });
     
-    set({ profile: { ...profile, quests: newQuests, passXP: profile.passXP + 5 } });
+    if (hasChanges) {
+      set({ profile: { ...profile, quests: newQuests, passXP: profile.passXP + 10 } });
+      
+      // Auto-claim logic: "sempre que o jogador cumpra ele receba as recompensas"
+      newQuests.forEach(q => {
+        if (q.current >= q.target && !q.isClaimed) {
+          get().claimQuest(q.id);
+        }
+      });
+    }
   },
 
   claimQuest: (questId) => {
@@ -200,12 +218,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const quest = profile.quests.find(q => q.id === questId);
     if (!quest || quest.current < quest.target || quest.isClaimed) return;
 
-    if (quest.rewardType === 'OURO') get().addRewards(quest.rewardValue, 0);
-    if (quest.rewardType === 'GEMAS') get().addRewards(0, quest.rewardValue);
-    if (quest.rewardType === 'BAU') get().addChest(quest.rewardValue);
+    // Processa a recompensa imediatamente
+    if (quest.rewardType === 'OURO') get().addRewards(quest.rewardValue as number, 0);
+    if (quest.rewardType === 'GEMAS') get().addRewards(0, quest.rewardValue as number);
+    if (quest.rewardType === 'BAU') get().addChest(quest.rewardValue as any);
 
     const newQuests = profile.quests.map(q => q.id === questId ? { ...q, isClaimed: true } : q);
-    set({ profile: { ...profile, quests: newQuests } });
+    set({ profile: { ...get().profile!, quests: newQuests } });
   },
 
   claimPassReward: (tierIndex, isPremium) => {

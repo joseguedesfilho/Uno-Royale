@@ -13,46 +13,36 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background: #0b1421;
+            background: #1a2b45; /* Azul Royale Profundo */
             user-select: none;
         }
         
         .clash-text {
             letter-spacing: -0.5px;
+            /* Efeitos de sombra removidos conforme solicitado */
         }
 
-        /* Arena 3D Perspective */
-        .arena-perspective {
-            perspective: 1200px;
+        /* Botão Estilo Royale 3D */
+        .btn-3d {
+            transition: all 0.1s;
+            border-bottom-width: 6px;
         }
-        .arena-floor {
-            transform: rotateX(25deg);
-            transform-style: preserve-3d;
-        }
-
-        /* Efeito de Brilho Dinâmico conforme a Cor */
-        .glow-red { box-shadow: 0 0 50px rgba(239, 68, 68, 0.4); }
-        .glow-blue { box-shadow: 0 0 50px rgba(59, 130, 246, 0.4); }
-        .glow-yellow { box-shadow: 0 0 50px rgba(234, 179, 8, 0.4); }
-        .glow-green { box-shadow: 0 0 50px rgba(34, 197, 94, 0.4); }
-
-        @keyframes kingWhisper {
-            0% { opacity: 0; transform: translateY(20px) scale(0.9); filter: blur(10px); }
-            15% { opacity: 0.6; transform: translateY(0) scale(1); filter: blur(0); }
-            85% { opacity: 0.6; transform: translateY(-10px) scale(1); filter: blur(0); }
-            100% { opacity: 0; transform: translateY(-30px) scale(1.1); filter: blur(5px); }
-        }
-
-        .animate-king-whisper {
-            animation: kingWhisper 4s forwards cubic-bezier(0.16, 1, 0.3, 1);
+        .btn-3d:active {
+            transform: translateY(4px);
+            border-bottom-width: 2px;
         }
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-        .text-glow {
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px rgba(59, 130, 246, 0.5);
+        .bg-royale-blue { background: linear-gradient(to bottom, #3558a7, #1a2b45); }
+        .bg-royale-gold { background: linear-gradient(to bottom, #f59e0b, #d97706); }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
         }
+        .animate-float { animation: float 3s ease-in-out infinite; }
     </style>
 <script type="importmap">
 {

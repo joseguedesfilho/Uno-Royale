@@ -17,7 +17,7 @@ const PassRoyaleView = ({ onBack }: { onBack: () => void }) => {
   const currentLevel = Math.floor(profile.passXP / 100);
 
   return (
-    <div className="h-screen w-full bg-[#0b1421] flex flex-col text-white animate-in slide-in-from-right duration-500 overflow-hidden">
+    <div className="h-full w-full bg-[#0b1421] flex flex-col text-white animate-in slide-in-from-right duration-500 overflow-hidden">
       <div className="px-6 py-6 bg-gradient-to-r from-[#d97706] via-[#f59e0b] to-[#d97706] border-b-4 border-yellow-900 shadow-2xl relative shrink-0 z-20">
         <div className="flex items-center justify-between">
            <button onClick={onBack} className="w-10 h-10 bg-black/40 rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-transform text-white">🔙</button>
@@ -64,7 +64,7 @@ const PassRoyaleView = ({ onBack }: { onBack: () => void }) => {
       </div>
 
       {!profile.hasPremiumPass && (
-        <div className="fixed bottom-0 w-full p-4 bg-gradient-to-t from-black to-transparent z-50">
+        <div className="fixed bottom-24 w-full px-4 z-50">
            <button className="w-full bg-yellow-400 py-4 rounded-3xl border-b-6 border-yellow-700 font-black clash-text italic text-lg text-black uppercase active:translate-y-1 active:border-b-0 shadow-2xl">
               ATIVAR PASS PREMIUM 💎 500
            </button>
