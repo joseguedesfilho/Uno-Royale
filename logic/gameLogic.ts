@@ -50,52 +50,76 @@ export const createDeck = (playerDeckIds?: string[]): Card[] => {
 
 export const isCardPlayable = (card: Card, topCard: Card | undefined, currentColor: CardColor): boolean => {
   if (!card || !topCard) return false;
+  // Cartas especiais (Coringa/+4) sempre podem ser jogadas
   if (card.color === 'Especial') return true;
+  // Mesma cor
   if (card.color === currentColor) return true;
+  // Mesmo tipo (Pular, Inverter, +2)
   if (card.type === topCard.type && card.type !== CardType.NUMBER) return true;
+  // Mesmo número
   if (card.type === CardType.NUMBER && topCard.type === CardType.NUMBER && card.value === topCard.value) return true;
   return false;
 };
 
 export const isValidCombo = (selectedCards: Card[], topCard: Card | undefined, currentColor: CardColor, isMyTurn: boolean): boolean => {
   if (selectedCards.length === 0 || !topCard) return false;
-  const firstCard = selectedCards[0];
   
+  // A primeira carta do combo DEVE ser jogável em relação à mesa
+  const firstCard = selectedCards[0];
   const canStart = isCardPlayable(firstCard, topCard, currentColor);
   if (!canStart) return false;
 
+  // Se houver mais de uma carta, todas as subsequentes devem ter o mesmo VALOR ou TIPO da primeira
   for (let i = 1; i < selectedCards.length; i++) {
     const card = selectedCards[i];
     if (firstCard.type === CardType.NUMBER) {
+      // Se for número, todos devem ser o mesmo número (independente da cor)
       if (card.type !== CardType.NUMBER || card.value !== firstCard.value) return false;
     } else {
+      // Se for ação (Pular, Inverter, etc), todos devem ser o mesmo tipo
       if (card.type !== firstCard.type) return false;
     }
-    if (card.color !== firstCard.color && card.color !== 'Especial') return false;
   }
   return true;
 };
 
 export const getBotMove = (hand: Card[], topCard: Card | undefined, currentColor: CardColor, botDifficulty: number = 0): Card[] => {
   if (!topCard) return [];
-  const playable = hand.filter(c => isCardPlayable(c, topCard, currentColor));
-  if (playable.length === 0) return [];
+  
+  // Encontra todas as cartas que poderiam iniciar uma jogada
+  const starterPlayable = hand.filter(c => isCardPlayable(c, topCard, currentColor));
+  if (starterPlayable.length === 0) return [];
 
-  // Bots tentam priorizar combos de números
-  const numberPlayable = playable.filter(c => c.type === CardType.NUMBER);
-  if (numberPlayable.length > 0) {
-     const cardToPlay = numberPlayable[0];
-     const combo = hand.filter(c => c.type === CardType.NUMBER && c.value === cardToPlay.value && c.color === cardToPlay.color);
-     if (combo.length > 0) return combo;
+  // Tenta encontrar o melhor combo possível
+  let bestCombo: Card[] = [];
+
+  for (const starter of starterPlayable) {
+    let currentCombo: Card[] = [starter];
+    
+    // Procura outras cartas na mão que combinem com a iniciadora (mesmo número ou tipo)
+    const matches = hand.filter(c => 
+      c.instanceId !== starter.instanceId && 
+      ((starter.type === CardType.NUMBER && c.type === CardType.NUMBER && c.value === starter.value) ||
+       (starter.type !== CardType.NUMBER && c.type === starter.type))
+    );
+    
+    currentCombo = [...currentCombo, ...matches];
+    
+    if (currentCombo.length > bestCombo.length) {
+      bestCombo = currentCombo;
+    }
   }
 
-  // Bots inteligentes guardam cartas especiais para o final
-  const normalCards = playable.filter(c => c.color !== 'Especial');
-  const specialCards = playable.filter(c => c.color === 'Especial');
+  // Se não achou combo, joga uma carta aleatória das jogáveis, priorizando não-especiais
+  if (bestCombo.length <= 1) {
+    const normalCards = starterPlayable.filter(c => c.color !== 'Especial');
+    const chosen = normalCards.length > 0 
+      ? normalCards[Math.floor(Math.random() * normalCards.length)] 
+      : starterPlayable[0];
+    return [chosen];
+  }
 
-  let cardToPlay = normalCards.length > 0 ? normalCards[Math.floor(Math.random()*normalCards.length)] : specialCards[0];
-
-  return [cardToPlay];
+  return bestCombo;
 };
 
 export const getRandomColor = (): CardColor => {

@@ -87,7 +87,6 @@ const GameView: React.FC = () => {
     const botCount = activeRoom ? (activeRoom.maxPlayers - 1) : (isBossBattle ? 1 : arena.bots);
     const initialPlayers: any[] = [{ id: 'player', name: 'Você', isBot: false, cards: [], avatar: '👑' }];
     
-    // ARENA 1 POWER: Bots start with 4 cards
     const initialBotHandSize = currentArenaIndex === 0 ? 4 : 7;
 
     if (isRanked && selectedOpponent) {
@@ -126,7 +125,6 @@ const GameView: React.FC = () => {
     setPlayers(currentPlayers => {
       if (currentPlayers.length === 0) return currentPlayers;
       
-      // ARENA 7 POWER: Random turn inversion
       let finalDirection = direction;
       if (currentArenaIndex === 6 && Math.random() < 0.15) {
         finalDirection *= -1;
@@ -140,9 +138,8 @@ const GameView: React.FC = () => {
     setSelectedCardsIds([]);
     setUnoDeclared(false);
     
-    // Reset or apply Rage/Panic time limit
     if (rageEffect) {
-       setTimeLeft(3); // Panic mode
+       setTimeLeft(3); 
        setRageEffect(false);
     } else {
        setTimeLeft(turnTimeLimit);
@@ -169,8 +166,8 @@ const GameView: React.FC = () => {
     const topCardBefore = discardPile[discardPile.length - 1];
     let cardsToExecute = [...cards];
 
-    // HABILIDADE ESPELHO: Repetir a última carta
-    if (cardsToExecute.length === 1 && cardsToExecute[0].type === CardType.WILD) {
+    // HABILIDADE ESPELHO: Se for a carta Mirror, ela copia a anterior
+    if (cardsToExecute.length === 1 && cardsToExecute[0].id === 'spell-mirror') {
        const mirror = { ...cardsToExecute[0] };
        mirror.type = topCardBefore.type;
        mirror.value = topCardBefore.value;
@@ -179,6 +176,7 @@ const GameView: React.FC = () => {
        triggerKingCommentary("Espelho Real!");
     }
 
+    // A ÚLTIMA CARTA jogada vira a nova referência da mesa
     const lastCard = cardsToExecute[cardsToExecute.length - 1];
 
     setPlayers(prevPlayers => {
@@ -196,6 +194,7 @@ const GameView: React.FC = () => {
       let skip = 1;
       let colorToSet: CardColor = lastCard.color === 'Especial' ? (chosenColor || getRandomColor()) : lastCard.color;
 
+      // Efeitos baseados na ÚLTIMA CARTA do combo
       if (lastCard.type === CardType.SKIP) { 
         sounds.playFreeze(); 
         setFreezeOverlay(true); 
@@ -208,7 +207,7 @@ const GameView: React.FC = () => {
       else if (lastCard.type === CardType.DRAW4) { 
         const vIdx = (playerIndex + (1 * direction) + updatedPlayers.length) % updatedPlayers.length; 
         setTimeout(() => drawCard(vIdx, 4), 500); 
-        setRageEffect(true); // Proxima rodada será curta (Pânico)
+        setRageEffect(true); 
         skip = 2; 
         triggerKingCommentary("Pânico Total!");
       }
@@ -227,16 +226,7 @@ const GameView: React.FC = () => {
            updateTrophies(playerIndex === 0 ? 30 : -15);
         }, 500);
       } else {
-        // ARENA 5 POWER: Double play for bots
-        const isDoublePlayArena = currentArenaIndex === 4;
-        const botCanDoublePlay = updatedPlayers[playerIndex].isBot && isDoublePlayArena && Math.random() < 0.4;
-        
-        if (botCanDoublePlay) {
-           triggerKingCommentary("Dobro de Magia!");
-           setTimeout(() => setIsProcessing(false), 300);
-        } else {
-           setTimeout(() => { setIsProcessing(false); nextTurn(skip); }, 600);
-        }
+        setTimeout(() => { setIsProcessing(false); nextTurn(skip); }, 600);
       }
       return updatedPlayers;
     });
@@ -246,7 +236,6 @@ const GameView: React.FC = () => {
     if (players[turn]?.isBot && !isProcessing && !showColorPicker && discardPile.length > 0) {
       const moves = getBotMove(players[turn].cards, discardPile[discardPile.length - 1], currentColor);
       
-      // Bot random emote
       if (Math.random() < 0.1) {
         const botEmotes = ['😂', '😠', '👍', '😭'];
         sendEmote(botEmotes[Math.floor(Math.random()*4)], turn);
@@ -321,7 +310,6 @@ const GameView: React.FC = () => {
           ))}
         </div>
         
-        {/* EMOTE PICKER TRIGGER */}
         <button 
           onClick={() => setShowEmotePicker(!showEmotePicker)} 
           className="w-12 h-12 bg-blue-600/80 rounded-2xl border-2 border-white/10 flex items-center justify-center text-xl shadow-2xl active:scale-90 transition-transform"
@@ -355,7 +343,6 @@ const GameView: React.FC = () => {
       </div>
 
       <div className="w-full h-[35vh] sm:h-[40vh] relative flex flex-col items-center justify-end overflow-visible z-[400] pb-6">
-        {/* PLAYER EMOTE BUBBLE */}
         {players[0]?.emote && (
           <div className="absolute top-[-40px] bg-white rounded-2xl px-6 py-2 text-3xl shadow-2xl animate-bounce z-[700]">
              {players[0].emote}
@@ -370,9 +357,9 @@ const GameView: React.FC = () => {
                 const playerHand = players[0].cards;
                 const selected = selectedCardsIds.map(id => playerHand.find(c => c.instanceId === id)!).filter(Boolean);
                 if (selected.length > 0 && isValidCombo(selected, topDiscardCard, currentColor, turn === 0)) {
-                  if (selected[0].color === 'Especial' && selected[0].type === CardType.DRAW4) { setPendingCards(selected); setShowColorPicker(true); }
-                  else if (selected[0].color === 'Especial' && selected[0].type === CardType.WILD) { executePlay(0, selected); } // Mirror copies, doesn't pick color
-                  else if (selected[0].color === 'Especial') { setPendingCards(selected); setShowColorPicker(true); }
+                  const lastInCombo = selected[selected.length - 1];
+                  if (lastInCombo.color === 'Especial' && lastInCombo.type === CardType.DRAW4) { setPendingCards(selected); setShowColorPicker(true); }
+                  else if (lastInCombo.color === 'Especial' && lastInCombo.type === CardType.WILD) { setPendingCards(selected); setShowColorPicker(true); }
                   else executePlay(0, selected);
                 }
               }} 

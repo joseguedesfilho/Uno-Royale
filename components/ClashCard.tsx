@@ -92,27 +92,31 @@ const ClashCard: React.FC<ClashCardProps> = memo(({ card, onClick, playable, sel
         transition-all duration-300 transform-gpu active:scale-95
         relative overflow-hidden shadow-[0_12px_30px_rgba(0,0,0,0.7)]
         ${selected ? 'ring-4 ring-yellow-400 -translate-y-4' : ''}
-        ${playable && !selected ? 'brightness-110 saturate-150' : ''}
-        ${!playable && !selected && !hidden ? 'grayscale brightness-50' : ''}
+        ${playable && !selected ? 'ring-2 ring-white/50 brightness-110' : ''}
       `}
     >
       <div className={`absolute inset-[3px] rounded-xl ${bgColor} shadow-inner`}></div>
       
-      <div className="absolute top-1.5 left-2 font-black text-white italic text-lg drop-shadow-lg z-20">
+      <div className="absolute top-1.5 left-2 font-black text-white italic text-lg z-20">
         {unoRef || symbol}
       </div>
 
       <div className="relative flex-1 w-full flex flex-col items-center justify-center z-10 px-2">
         <div className="w-[80%] aspect-square bg-white/5 rounded-full flex items-center justify-center border border-white/5 shadow-inner overflow-hidden">
-           <span className={`font-black italic drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)] ${size === 'lg' ? 'text-6xl' : size === 'md' ? 'text-4xl' : 'text-3xl'} text-white`}>
+           <span className={`font-black italic ${size === 'lg' ? 'text-6xl' : size === 'md' ? 'text-4xl' : 'text-3xl'} text-white`}>
             {symbol}
           </span>
         </div>
       </div>
 
-      <div className="absolute bottom-1.5 right-2 font-black text-white italic text-lg drop-shadow-lg z-20 rotate-180">
+      <div className="absolute bottom-1.5 right-2 font-black text-white italic text-lg z-20 rotate-180">
         {unoRef || symbol}
       </div>
+      
+      {/* Overlay sutil para cartas jogáveis sem escurecer as outras */}
+      {playable && !selected && (
+        <div className="absolute inset-0 bg-white/5 animate-pulse pointer-events-none"></div>
+      )}
     </div>
   );
 });
