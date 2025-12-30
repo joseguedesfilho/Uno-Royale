@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useGameStore } from '../store.ts';
 import { Player, Card, CardColor, CardType, GameStatus } from '../types.ts';
@@ -67,17 +66,22 @@ const GameView: React.FC = () => {
 
   const triggerKingCommentary = async (eventContext: string) => {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
       const prompt = `Você é o Rei Narrador de uma arena real. Comente brevemente: "${eventContext}". Use 2 ou 3 palavras épicas e medievais. Sem aspas.`;
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
       });
-      const text = response.text?.trim().toUpperCase() || "PODER REAL!";
+      // Garante que o texto seja uma string pura
+      const resultText = response.text;
+      const text = (typeof resultText === 'string' ? resultText : "PODER REAL!").trim().toUpperCase();
+      
       setKingCommentary({ id: Date.now(), text });
       if (commentaryTimeoutRef.current) clearTimeout(commentaryTimeoutRef.current);
       commentaryTimeoutRef.current = setTimeout(() => setKingCommentary(null), 3500);
-    } catch (e) { }
+    } catch (e) { 
+      console.warn("Falha no comentário do Rei", e);
+    }
   };
 
   useEffect(() => {
@@ -154,7 +158,6 @@ const GameView: React.FC = () => {
     setDeck(prevDeck => {
       const newDeck = [...prevDeck];
       if (newDeck.length < count) {
-        // Repõe o deck se acabar
         const reshuffled = createDeck(profile?.activeDeck);
         cardsToDraw = [...newDeck, ...reshuffled.splice(0, count - newDeck.length)];
         return reshuffled;
@@ -169,17 +172,13 @@ const GameView: React.FC = () => {
     setIsProcessing(true);
     sounds.playCardPlay();
     
-    const topCardBefore = discardPile[discardPile.length - 1];
     let cardsToExecute = [...cards];
-
-    // A ÚLTIMA CARTA jogada vira a nova referência da mesa (Regra do Espelho/Combo)
     const lastCard = cardsToExecute[cardsToExecute.length - 1];
 
     setPlayers(prevPlayers => {
       const updatedPlayers = prevPlayers.map((p, idx) => {
         if (idx === playerIndex) {
           const newHand = p.cards.filter(c => !cards.some(played => played.instanceId === c.instanceId));
-          // Regra do UNO: Penalidade por não gritar
           if (playerIndex === 0 && newHand.length === 1 && !unoDeclared) {
              setTimeout(() => { drawCard(0, 2); triggerKingCommentary("Esqueceu o Grito!"); }, 400);
           }
@@ -191,7 +190,6 @@ const GameView: React.FC = () => {
       let skip = 1;
       let colorToSet: CardColor = lastCard.color === 'Especial' ? (chosenColor || getRandomColor()) : lastCard.color;
 
-      // Efeitos baseados na ÚLTIMA CARTA jogada no combo
       if (lastCard.type === CardType.SKIP) { 
         sounds.playFreeze(); 
         setFreezeOverlay(true); 
@@ -281,7 +279,7 @@ const GameView: React.FC = () => {
         {kingCommentary && (
           <div key={kingCommentary.id} className="animate-king-whisper text-center px-4">
              <span className="text-5xl sm:text-7xl font-black clash-text italic uppercase text-white drop-shadow-[0_0_20px_rgba(0,0,0,1)] tracking-tighter">
-                {kingCommentary.text}
+                {String(kingCommentary.text)}
              </span>
           </div>
         )}
@@ -355,7 +353,6 @@ const GameView: React.FC = () => {
                 const selected = selectedCardsIds.map(id => playerHand.find(c => c.instanceId === id)!).filter(Boolean);
                 if (selected.length > 0 && isValidCombo(selected, topDiscardCard, currentColor, turn === 0)) {
                   const lastInCombo = selected[selected.length - 1];
-                  // Se a última carta for especial, precisa escolher cor
                   if (lastInCombo.color === 'Especial') { 
                     setPendingCards(selected); 
                     setShowColorPicker(true); 

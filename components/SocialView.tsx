@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store.ts';
 
@@ -43,13 +42,13 @@ const SocialView: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar pb-32">
         {activeSubTab === 'Chat' && socialFeed.map((m) => (
           <div key={m.id} className="flex gap-3 items-end animate-in slide-in-from-bottom-2 duration-300">
-             <div className="w-10 h-10 bg-black/40 rounded-xl flex items-center justify-center text-xl border border-white/10 shrink-0">{m.avatar}</div>
+             <div className="w-10 h-10 bg-black/40 rounded-xl flex items-center justify-center text-xl border border-white/10 shrink-0">{String(m.avatar || '👤')}</div>
              <div className={`border border-white/10 rounded-2xl rounded-bl-none p-3 max-w-[80%] ${m.user === profile?.name ? 'bg-blue-600/20' : 'bg-white/5'}`}>
                 <div className="flex justify-between gap-4 mb-1">
-                   <span className="text-[9px] font-black text-blue-400 uppercase italic">{m.user}</span>
+                   <span className="text-[9px] font-black text-blue-400 uppercase italic">{String(m.user || 'Anonimo')}</span>
                    <span className="text-[7px] text-white/30">{formatTime(m.timestamp)}</span>
                 </div>
-                <p className="text-xs font-medium leading-tight">{m.text}</p>
+                <p className="text-xs font-medium leading-tight">{typeof m.text === 'string' ? m.text : JSON.stringify(m.text)}</p>
              </div>
           </div>
         ))}
