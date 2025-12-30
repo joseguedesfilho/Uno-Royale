@@ -3,11 +3,11 @@ export type CardColor = 'Red' | 'Blue' | 'Yellow' | 'Green' | 'Wild';
 
 export enum CardType {
   NUMBER = 'NUMBER',
-  SKIP = 'SKIP', // Freeze
-  REVERSE = 'REVERSE', // The Log
-  DRAW2 = 'DRAW2', // Rage
-  DRAW4 = 'DRAW4', // Skeleton Army
-  WILD = 'WILD', // Mirror
+  SKIP = 'SKIP', 
+  REVERSE = 'REVERSE', 
+  DRAW2 = 'DRAW2', 
+  DRAW4 = 'DRAW4', 
+  WILD = 'WILD', 
 }
 
 export type Rarity = 'Comum' | 'Rara' | 'Épica' | 'Lendária';
@@ -20,6 +20,7 @@ export interface CardDefinition {
   label: string;
   rarity: Rarity;
   description: string;
+  levelEffect: string;
 }
 
 export interface CardInstance {
@@ -29,9 +30,18 @@ export interface CardInstance {
 }
 
 export interface Card extends CardDefinition {
-  // Versão estendida usada durante a partida (contendo IDs únicos de instância)
   instanceId: string;
   color: CardColor;
+  currentLevel?: number;
+}
+
+export interface Chest {
+  id: string;
+  type: 'Prata' | 'Ouro' | 'Lendário';
+  rarity: Rarity;
+  unlockTime: number; 
+  isOpening: boolean;
+  startTime?: number;
 }
 
 export interface Player {
@@ -40,6 +50,25 @@ export interface Player {
   isBot: boolean;
   cards: Card[];
   avatar: string;
+  isBoss?: boolean;
+}
+
+export interface LobbyPlayer {
+  id: string;
+  name: string;
+  level: number;
+  trophies: number;
+  avatar: string;
+  status: 'Disponível' | 'Em Partida' | 'Aguardando';
+  quote?: string;
+}
+
+export interface TrophyReward {
+  id: string;
+  trophiesRequired: number;
+  type: 'GOLD' | 'GEMS' | 'CHEST' | 'CARD' | 'BOSS';
+  value: number | string;
+  label: string;
 }
 
 export interface UserProfile {
@@ -51,15 +80,21 @@ export interface UserProfile {
   trophies: number;
   currentArena: number;
   collection: CardInstance[];
-  activeDeck: string[]; // IDs das 8 cartas selecionadas
+  activeDeck: string[]; 
+  chestSlots: (Chest | null)[];
+  claimedRewards: string[]; 
+  isFirstTime: boolean;
 }
 
 export enum GameStatus {
   MENU = 'MENU',
   LOADING = 'LOADING',
+  LOBBY = 'LOBBY',
   BATTLE = 'BATTLE',
   VICTORY = 'VICTORY',
-  DEFEAT = 'DEFEAT'
+  DEFEAT = 'DEFEAT',
+  TROPHY_ROAD = 'TROPHY_ROAD',
+  ARENA_SELECTION = 'ARENA_SELECTION'
 }
 
 export type ArenaTheme = {
@@ -68,4 +103,5 @@ export type ArenaTheme = {
   minTrophies: number;
   bgColor: string;
   banner: string;
+  bossPower?: string;
 };

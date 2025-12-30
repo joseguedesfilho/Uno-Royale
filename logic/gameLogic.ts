@@ -1,30 +1,48 @@
 
-import { Card, CardType, CardColor, CardDefinition } from '../types';
+import { Card, CardType, CardColor } from '../types';
 import { COLORS, ALL_CARDS } from '../constants';
 
 export const createDeck = (playerDeckIds?: string[]): Card[] => {
   const deck: Card[] = [];
   const colors: CardColor[] = ['Red', 'Blue', 'Yellow', 'Green'];
   
-  // Se não houver deck definido (ex: bots ou fallback), usa o catálogo completo
-  const sourceCards = playerDeckIds 
-    ? ALL_CARDS.filter(c => playerDeckIds.includes(c.id))
-    : ALL_CARDS;
-
-  sourceCards.forEach(cardDef => {
-    // Para cada definição no deck, criamos versões em múltiplas cores para o jogo fluir
-    const cardColors = cardDef.baseColor === 'Wild' ? ['Wild' as CardColor] : colors;
-    
-    cardColors.forEach(color => {
-      // Adicionamos 2 cópias de cada para garantir volume de deck
-      for(let i = 0; i < 2; i++) {
+  colors.forEach(color => {
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(num => {
+      const copies = num === 0 ? 1 : 2;
+      const cardDef = ALL_CARDS.find(c => c.type === CardType.NUMBER && c.value === num) || ALL_CARDS[0];
+      
+      for(let i = 0; i < copies; i++) {
         deck.push({
           ...cardDef,
-          instanceId: `${cardDef.id}-${color}-${i}-${Math.random()}`,
-          color: color
+          instanceId: `card-${color}-${num}-${i}-${Math.random()}`,
+          color: color,
         });
       }
     });
+
+    const actions = [CardType.SKIP, CardType.REVERSE, CardType.DRAW2];
+    actions.forEach(type => {
+      const cardDef = ALL_CARDS.find(c => c.type === type) || ALL_CARDS[10];
+      for(let i = 0; i < 2; i++) {
+        deck.push({
+          ...cardDef,
+          instanceId: `action-${color}-${type}-${i}-${Math.random()}`,
+          color: color,
+        });
+      }
+    });
+  });
+
+  const wilds = [CardType.WILD, CardType.DRAW4];
+  wilds.forEach(type => {
+    const cardDef = ALL_CARDS.find(c => c.type === type) || ALL_CARDS[14];
+    for(let i = 0; i < 4; i++) {
+      deck.push({
+        ...cardDef,
+        instanceId: `wild-${type}-${i}-${Math.random()}`,
+        color: 'Wild',
+      });
+    }
   });
 
   return deck.sort(() => Math.random() - 0.5);
@@ -65,9 +83,24 @@ export const isValidCombo = (selectedCards: Card[], topCard: Card, currentColor:
   return true;
 };
 
-export const getBotMove = (hand: Card[], topCard: Card, currentColor: CardColor): Card[] => {
+export const getBotMove = (hand: Card[], topCard: Card, currentColor: CardColor, botDifficulty: number = 0): Card[] => {
   const playable = hand.filter(c => isCardPlayable(c, topCard, currentColor));
   if (playable.length === 0) return [];
+
+  // Lógica de "Mãos de Elite" para arenas superiores
+  if (botDifficulty > 3) {
+    // Guarda o +4 e o Wild se tiver outras opções, a menos que esteja com poucas cartas
+    if (hand.length > 3) {
+      const normalOptions = playable.filter(c => c.color !== 'Wild');
+      if (normalOptions.length > 0) {
+        // Tenta jogar ações primeiro para atrapalhar
+        const actions = normalOptions.filter(c => c.type !== CardType.NUMBER);
+        if (actions.length > 0) return [actions[0]];
+        return [normalOptions[0]];
+      }
+    }
+  }
+
   const firstCard = playable[0];
   if (firstCard.type === CardType.NUMBER) {
     return hand.filter(c => c.type === CardType.NUMBER && c.value === firstCard.value);
