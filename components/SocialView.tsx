@@ -1,16 +1,31 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store.ts';
 
 const SocialView: React.FC = () => {
-  const { profile } = useGameStore();
+  const { profile, socialFeed, fetchSocialMessages, addSocialMessage } = useGameStore();
   const [activeSubTab, setActiveSubTab] = useState('Chat');
+  const [inputText, setInputText] = useState('');
 
-  const messages = [
-    { user: 'Rei Arthur', text: 'Alguém para trocar O Tronco?', time: '12:45', avatar: '🤴' },
-    { user: 'Bárbaro', text: 'Boa jogada na última arena!', time: '12:50', avatar: '🪓' },
-    { user: 'Arqueira', text: 'O deck de azuis está muito forte.', time: '13:02', avatar: '🏹' },
-  ];
+  useEffect(() => {
+    if (activeSubTab === 'Chat') {
+      fetchSocialMessages();
+      const interval = setInterval(fetchSocialMessages, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [activeSubTab, fetchSocialMessages]);
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim()) return;
+    const text = inputText;
+    setInputText('');
+    await addSocialMessage(text);
+  };
+
+  const formatTime = (ts: number) => {
+    const date = new Date(ts);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <div className="flex flex-col h-full bg-[#1a2b45] text-white animate-in slide-in-from-right duration-300">
@@ -26,13 +41,13 @@ const SocialView: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar pb-32">
-        {activeSubTab === 'Chat' && messages.map((m, i) => (
-          <div key={i} className="flex gap-3 items-end">
+        {activeSubTab === 'Chat' && socialFeed.map((m) => (
+          <div key={m.id} className="flex gap-3 items-end animate-in slide-in-from-bottom-2 duration-300">
              <div className="w-10 h-10 bg-black/40 rounded-xl flex items-center justify-center text-xl border border-white/10 shrink-0">{m.avatar}</div>
-             <div className="bg-white/5 border border-white/10 rounded-2xl rounded-bl-none p-3 max-w-[80%]">
+             <div className={`border border-white/10 rounded-2xl rounded-bl-none p-3 max-w-[80%] ${m.user === profile?.name ? 'bg-blue-600/20' : 'bg-white/5'}`}>
                 <div className="flex justify-between gap-4 mb-1">
                    <span className="text-[9px] font-black text-blue-400 uppercase italic">{m.user}</span>
-                   <span className="text-[7px] text-white/30">{m.time}</span>
+                   <span className="text-[7px] text-white/30">{formatTime(m.timestamp)}</span>
                 </div>
                 <p className="text-xs font-medium leading-tight">{m.text}</p>
              </div>
@@ -46,12 +61,32 @@ const SocialView: React.FC = () => {
               <button className="mt-2 bg-yellow-500 px-8 py-3 rounded-2xl border-b-4 border-yellow-800 text-black font-black uppercase text-xs btn-3d">BUSCAR CLÃ</button>
            </div>
         )}
+
+        {activeSubTab === 'Amigos' && (
+           <div className="flex flex-col items-center justify-center py-20 opacity-30 gap-4">
+              <span className="text-6xl">👥</span>
+              <span className="text-[10px] font-black uppercase tracking-widest italic">Nenhum amigo online</span>
+              <button className="mt-2 bg-blue-600 px-8 py-3 rounded-2xl border-b-4 border-blue-900 text-white font-black uppercase text-xs btn-3d">CONVIDAR</button>
+           </div>
+        )}
       </div>
 
       <div className="p-4 bg-black/40 border-t border-white/10 shrink-0 mb-20">
          <div className="flex gap-2">
-            <input type="text" placeholder="Escreva para o Clã..." className="flex-1 bg-black/40 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-blue-400" />
-            <button className="bg-blue-600 w-12 h-12 rounded-xl flex items-center justify-center text-lg active:scale-90 transition-transform">➤</button>
+            <input 
+              type="text" 
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+              placeholder="Escreva para o Panteão..." 
+              className="flex-1 bg-black/40 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-blue-400" 
+            />
+            <button 
+              onClick={handleSendMessage}
+              className="bg-blue-600 w-12 h-12 rounded-xl flex items-center justify-center text-lg active:scale-90 transition-transform"
+            >
+              ➤
+            </button>
          </div>
       </div>
     </div>

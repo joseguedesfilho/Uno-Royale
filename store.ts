@@ -39,6 +39,7 @@ interface GameStore {
   fetchLobbyPlayers: () => Promise<void>;
   fetchLeaderboard: () => Promise<void>;
   fetchRooms: () => Promise<void>;
+  fetchSocialMessages: () => Promise<void>;
   setGameStatus: (status: GameStatus) => void;
   addRewards: (gold: number, gems: number, xpAmount?: number) => void;
   updateTrophies: (amount: number) => void;
@@ -63,7 +64,7 @@ interface GameStore {
   claimTrophyReward: (rewardId: string) => void;
   addChest: (type: 'Prata' | 'Ouro' | 'Lendário') => boolean;
   setLobbyPlayers: (players: LobbyPlayer[]) => void;
-  addSocialMessage: (msg: SocialMessage) => void;
+  addSocialMessage: (text: string) => Promise<void>;
   updateQuests: (event: { type: 'PLAY_CARD' | 'WIN_MATCH' | 'ARENA_PLAY', color?: string, arena?: number }) => void;
   claimQuest: (questId: string) => void;
   claimPassReward: (tierIndex: number, isPremium: boolean) => void;
@@ -203,7 +204,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (hasChanges) {
       set({ profile: { ...profile, quests: newQuests, passXP: profile.passXP + 10 } });
       
-      // Auto-claim logic: "sempre que o jogador cumpra ele receba as recompensas"
+      // Auto-claim logic
       newQuests.forEach(q => {
         if (q.current >= q.target && !q.isClaimed) {
           get().claimQuest(q.id);
@@ -218,7 +219,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const quest = profile.quests.find(q => q.id === questId);
     if (!quest || quest.current < quest.target || quest.isClaimed) return;
 
-    // Processa a recompensa imediatamente
     if (quest.rewardType === 'OURO') get().addRewards(quest.rewardValue as number, 0);
     if (quest.rewardType === 'GEMAS') get().addRewards(0, quest.rewardValue as number);
     if (quest.rewardType === 'BAU') get().addChest(quest.rewardValue as any);
@@ -329,6 +329,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
   fetchRooms: async () => {},
   fetchLeaderboard: async () => {},
   fetchLobbyPlayers: async () => {},
+  fetchSocialMessages: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('social_messages')
+        .select('*')
+        .order('timestamp', { ascending: true })
+        .limit(50);
+      if (error) throw error;
+      if (data) set({ socialFeed: data });
+    } catch (e) { console.error(e); }
+  },
   createRoom: async () => {},
   updateRoom: () => {},
   joinRoom: async () => {},
@@ -348,5 +359,31 @@ export const useGameStore = create<GameStore>((set, get) => ({
   advanceArena: () => { const p = get().profile; if (p) get().syncProfile({ currentArena: p.currentArena + 1 }); },
   claimTrophyReward: (rid) => { const p = get().profile; if (p) get().syncProfile({ claimedRewards: [...p.claimedRewards, rid] }); },
   setLobbyPlayers: () => {},
-  addSocialMessage: () => {}
+  addSocialMessage: async (text: string) => {
+    const { profile, session, isGuest } = get();
+    if (!profile) return;
+    
+    const newMessage: SocialMessage = {
+      id: `msg-${Date.now()}`,
+      user: profile.name,
+      avatar: '👑',
+      text,
+      timestamp: Date.now()
+    };
+
+    set({ socialFeed: [...get().socialFeed, newMessage] });
+
+    if (!isGuest && session) {
+      try {
+        await supabase.from('social_messages').insert({
+          id: newMessage.id,
+          user: newMessage.user,
+          avatar: newMessage.avatar,
+          text: newMessage.text,
+          timestamp: newMessage.timestamp,
+          user_id: session.user.id
+        });
+      } catch (e) { console.error(e); }
+    }
+  }
 })));

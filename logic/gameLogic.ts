@@ -63,6 +63,7 @@ export const isCardPlayable = (card: Card, topCard: Card | undefined, currentCol
 
 export const isValidCombo = (selectedCards: Card[], topCard: Card | undefined, currentColor: CardColor, isMyTurn: boolean): boolean => {
   if (selectedCards.length === 0 || !topCard) return false;
+  if (!isMyTurn) return false;
   
   // A primeira carta do combo DEVE ser jogável em relação à mesa
   const firstCard = selectedCards[0];
@@ -90,7 +91,7 @@ export const getBotMove = (hand: Card[], topCard: Card | undefined, currentColor
   const starterPlayable = hand.filter(c => isCardPlayable(c, topCard, currentColor));
   if (starterPlayable.length === 0) return [];
 
-  // Tenta encontrar o melhor combo possível
+  // Tenta encontrar o melhor combo possível para esvaziar a mão mais rápido
   let bestCombo: Card[] = [];
 
   for (const starter of starterPlayable) {
@@ -110,16 +111,8 @@ export const getBotMove = (hand: Card[], topCard: Card | undefined, currentColor
     }
   }
 
-  // Se não achou combo, joga uma carta aleatória das jogáveis, priorizando não-especiais
-  if (bestCombo.length <= 1) {
-    const normalCards = starterPlayable.filter(c => c.color !== 'Especial');
-    const chosen = normalCards.length > 0 
-      ? normalCards[Math.floor(Math.random() * normalCards.length)] 
-      : starterPlayable[0];
-    return [chosen];
-  }
-
-  return bestCombo;
+  // Se o bot achou um combo, ele joga. Se não, joga apenas uma carta válida.
+  return bestCombo.length > 0 ? bestCombo : [starterPlayable[0]];
 };
 
 export const getRandomColor = (): CardColor => {

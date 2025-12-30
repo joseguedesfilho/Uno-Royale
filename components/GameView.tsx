@@ -153,8 +153,14 @@ const GameView: React.FC = () => {
     
     setDeck(prevDeck => {
       const newDeck = [...prevDeck];
+      if (newDeck.length < count) {
+        // Repõe o deck se acabar
+        const reshuffled = createDeck(profile?.activeDeck);
+        cardsToDraw = [...newDeck, ...reshuffled.splice(0, count - newDeck.length)];
+        return reshuffled;
+      }
       cardsToDraw = newDeck.splice(0, count);
-      return newDeck.length === 0 && profile ? createDeck(profile.activeDeck) : newDeck;
+      return newDeck;
     });
     setPlayers(prevPlayers => prevPlayers.map((p, idx) => idx === playerIndex ? { ...p, cards: [...p.cards, ...cardsToDraw] } : p));
   }, [profile]);
@@ -166,23 +172,14 @@ const GameView: React.FC = () => {
     const topCardBefore = discardPile[discardPile.length - 1];
     let cardsToExecute = [...cards];
 
-    // HABILIDADE ESPELHO: Se for a carta Mirror, ela copia a anterior
-    if (cardsToExecute.length === 1 && cardsToExecute[0].id === 'spell-mirror') {
-       const mirror = { ...cardsToExecute[0] };
-       mirror.type = topCardBefore.type;
-       mirror.value = topCardBefore.value;
-       mirror.label = `Espelho de ${topCardBefore.label}`;
-       cardsToExecute = [mirror];
-       triggerKingCommentary("Espelho Real!");
-    }
-
-    // A ÚLTIMA CARTA jogada vira a nova referência da mesa
+    // A ÚLTIMA CARTA jogada vira a nova referência da mesa (Regra do Espelho/Combo)
     const lastCard = cardsToExecute[cardsToExecute.length - 1];
 
     setPlayers(prevPlayers => {
       const updatedPlayers = prevPlayers.map((p, idx) => {
         if (idx === playerIndex) {
           const newHand = p.cards.filter(c => !cards.some(played => played.instanceId === c.instanceId));
+          // Regra do UNO: Penalidade por não gritar
           if (playerIndex === 0 && newHand.length === 1 && !unoDeclared) {
              setTimeout(() => { drawCard(0, 2); triggerKingCommentary("Esqueceu o Grito!"); }, 400);
           }
@@ -194,7 +191,7 @@ const GameView: React.FC = () => {
       let skip = 1;
       let colorToSet: CardColor = lastCard.color === 'Especial' ? (chosenColor || getRandomColor()) : lastCard.color;
 
-      // Efeitos baseados na ÚLTIMA CARTA do combo
+      // Efeitos baseados na ÚLTIMA CARTA jogada no combo
       if (lastCard.type === CardType.SKIP) { 
         sounds.playFreeze(); 
         setFreezeOverlay(true); 
@@ -230,7 +227,7 @@ const GameView: React.FC = () => {
       }
       return updatedPlayers;
     });
-  }, [profile, isBossBattle, direction, unoDeclared, drawCard, nextTurn, setGameStatus, updateTrophies, currentArenaIndex, discardPile]);
+  }, [profile, isBossBattle, direction, unoDeclared, drawCard, nextTurn, setGameStatus, updateTrophies, discardPile]);
 
   useEffect(() => {
     if (players[turn]?.isBot && !isProcessing && !showColorPicker && discardPile.length > 0) {
@@ -358,8 +355,11 @@ const GameView: React.FC = () => {
                 const selected = selectedCardsIds.map(id => playerHand.find(c => c.instanceId === id)!).filter(Boolean);
                 if (selected.length > 0 && isValidCombo(selected, topDiscardCard, currentColor, turn === 0)) {
                   const lastInCombo = selected[selected.length - 1];
-                  if (lastInCombo.color === 'Especial' && lastInCombo.type === CardType.DRAW4) { setPendingCards(selected); setShowColorPicker(true); }
-                  else if (lastInCombo.color === 'Especial' && lastInCombo.type === CardType.WILD) { setPendingCards(selected); setShowColorPicker(true); }
+                  // Se a última carta for especial, precisa escolher cor
+                  if (lastInCombo.color === 'Especial') { 
+                    setPendingCards(selected); 
+                    setShowColorPicker(true); 
+                  }
                   else executePlay(0, selected);
                 }
               }} 
