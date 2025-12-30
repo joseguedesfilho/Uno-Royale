@@ -4,16 +4,17 @@ import { useGameStore } from '../store.ts';
 import { Player, Card, CardColor, CardType, GameStatus } from '../types.ts';
 import { createDeck, isCardPlayable, getBotMove, getRandomColor, isValidCombo } from '../logic/gameLogic.ts';
 import ClashCard from './ClashCard.tsx';
-import { ARENAS, COLORS, ALL_CARDS } from '../constants.tsx';
+import { ARENAS, COLORS } from '../constants.tsx';
 import { sounds } from '../logic/soundManager.ts';
+import { GoogleGenAI } from "@google/genai";
 
-// Timer component separate to prevent parent re-renders
-const TurnTimer = memo(({ timeLeft, totalTime }: { timeLeft: number, totalTime: number }) => {
+const TurnTimer = memo(({ timeLeft, totalTime, isUrgent }: { timeLeft: number, totalTime: number, isUrgent?: boolean }) => {
   const percentage = (timeLeft / totalTime) * 100;
+  const urgent = isUrgent || timeLeft <= 3;
   return (
-    <div className="w-32 h-1.5 bg-black/60 rounded-full mt-1 overflow-hidden p-[1px] border border-white/5">
+    <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/5 shadow-inner">
       <div 
-        className="h-full bg-blue-400 rounded-full transition-all duration-300" 
+        className={`h-full rounded-full transition-all duration-300 ${urgent ? 'bg-red-500 animate-pulse' : 'bg-blue-400'}`} 
         style={{ width: `${percentage}%` }}
       ></div>
     </div>
@@ -22,6 +23,7 @@ const TurnTimer = memo(({ timeLeft, totalTime }: { timeLeft: number, totalTime: 
 
 const GameView: React.FC = () => {
   const { 
+    gameStatus,
     currentArenaIndex, 
     setGameStatus, 
     updateTrophies, 
@@ -30,8 +32,7 @@ const GameView: React.FC = () => {
     isBossBattle, 
     isRanked,
     activeRoom,
-    selectedOpponent,
-    quitGame 
+    selectedOpponent
   } = useGameStore();
   
   const arena = ARENAS[currentArenaIndex];
@@ -39,126 +40,154 @@ const GameView: React.FC = () => {
   
   const [deck, setDeck] = useState<Card[]>([]);
   const [discardPile, setDiscardPile] = useState<Card[]>([]);
-  const [players, setPlayers] = useState<Player[]>([]);
+  const [players, setPlayers] = useState<(Player & { emote?: string, emoteTime?: number })[]>([]);
   const [turn, setTurn] = useState(0);
   const [direction, setDirection] = useState(1); 
   const [currentColor, setCurrentColor] = useState<CardColor>('Vermelho');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
   
   const [selectedCardsIds, setSelectedCardsIds] = useState<string[]>([]);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showEmotePicker, setShowEmotePicker] = useState(false);
   const [pendingCards, setPendingCards] = useState<Card[] | null>(null);
-  const [isShaking, setIsShaking] = useState(false);
   const [freezeOverlay, setFreezeOverlay] = useState(false);
-  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
-
+  const [rageEffect, setRageEffect] = useState(false);
+  const [kingCommentary, setKingCommentary] = useState<{id: number, text: string} | null>(null);
   const [timeLeft, setTimeLeft] = useState(turnTimeLimit);
   const [unoDeclared, setUnoDeclared] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const commentaryTimeoutRef = useRef<any>(null);
+
+  useEffect(() => {
+    const handleResize = () => setIsLandscape(window.innerWidth > window.innerHeight);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const triggerKingCommentary = async (eventContext: string) => {
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const prompt = `Você é o Rei Narrador de uma arena real. Comente brevemente: "${eventContext}". Use 2 ou 3 palavras épicas e medievais. Sem aspas.`;
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+      });
+      const text = response.text?.trim().toUpperCase() || "PODER REAL!";
+      setKingCommentary({ id: Date.now(), text });
+      if (commentaryTimeoutRef.current) clearTimeout(commentaryTimeoutRef.current);
+      commentaryTimeoutRef.current = setTimeout(() => setKingCommentary(null), 3500);
+    } catch (e) { }
+  };
 
   useEffect(() => {
     sounds.startBGM();
+    if (!profile) return;
     const fullDeck = createDeck(profile.activeDeck);
     const botCount = activeRoom ? (activeRoom.maxPlayers - 1) : (isBossBattle ? 1 : arena.bots);
+    const initialPlayers: any[] = [{ id: 'player', name: 'Você', isBot: false, cards: [], avatar: '👑' }];
     
-    const initialPlayers: Player[] = [{ id: 'player', name: 'Você', isBot: false, cards: [], avatar: '👑' }];
-    
+    // ARENA 1 POWER: Bots start with 4 cards
+    const initialBotHandSize = currentArenaIndex === 0 ? 4 : 7;
+
     if (isRanked && selectedOpponent) {
       initialPlayers.push({ id: selectedOpponent.id, name: selectedOpponent.name, isBot: true, cards: [], avatar: selectedOpponent.avatar });
-      for (let i = 1; i < botCount; i++) {
-        initialPlayers.push({ id: `bot-${i}`, name: `Desafiante ${i+1}`, isBot: true, cards: [], avatar: '🤖' });
-      }
-    } else if (activeRoom) {
-      for (let i = 0; i < botCount; i++) {
-        initialPlayers.push({ id: `opponent-${i}`, name: `Rival ${i + 1}`, isBot: true, cards: [], avatar: '🧛‍♂️' });
-      }
     } else {
       for (let i = 0; i < botCount; i++) {
-        initialPlayers.push({ id: `bot-${i}`, name: isBossBattle ? 'Mestre da Arena' : `Adversário ${i + 1}`, isBot: true, cards: [], avatar: isBossBattle ? '👹' : '🤖', isBoss: isBossBattle });
+        initialPlayers.push({ id: `bot-${i}`, name: isBossBattle ? 'Mestre' : `Rival ${i + 1}`, isBot: true, cards: [], avatar: isBossBattle ? '👹' : '🤖' });
       }
     }
 
-    const dealtPlayers = initialPlayers.map(p => {
-      const initialHandSize = (p.isBoss && arena.bossPower?.includes('4 cartas')) ? 4 : 7;
-      return { ...p, cards: fullDeck.splice(0, initialHandSize) };
-    });
-
+    const dealtPlayers = initialPlayers.map((p, idx) => ({ 
+      ...p, 
+      cards: fullDeck.splice(0, idx === 0 ? 7 : initialBotHandSize) 
+    }));
+    
     const firstCard = fullDeck.pop()!;
     setDeck(fullDeck);
     setDiscardPile([firstCard]);
     setCurrentColor(firstCard.color === 'Especial' ? getRandomColor() : firstCard.color);
     setPlayers(dealtPlayers);
 
-    return () => sounds.stopBGM();
-  }, [arena.bots, profile.activeDeck, isBossBattle, arena.bossPower, isRanked, selectedOpponent, activeRoom]);
+    return () => {
+      sounds.stopBGM();
+      if (commentaryTimeoutRef.current) clearTimeout(commentaryTimeoutRef.current);
+    };
+  }, []);
+
+  const sendEmote = (emote: string, playerIdx: number) => {
+    setPlayers(prev => prev.map((p, i) => i === playerIdx ? { ...p, emote, emoteTime: Date.now() } : p));
+    setTimeout(() => {
+      setPlayers(prev => prev.map((p, i) => i === playerIdx && p.emote === emote ? { ...p, emote: undefined } : p));
+    }, 3000);
+  };
 
   const nextTurn = useCallback((skipCount = 1) => {
     setPlayers(currentPlayers => {
       if (currentPlayers.length === 0) return currentPlayers;
-      setTurn(prev => (prev + (skipCount * direction) + currentPlayers.length) % currentPlayers.length);
+      
+      // ARENA 7 POWER: Random turn inversion
+      let finalDirection = direction;
+      if (currentArenaIndex === 6 && Math.random() < 0.15) {
+        finalDirection *= -1;
+        setDirection(finalDirection);
+        triggerKingCommentary("Destino Trocado!");
+      }
+
+      setTurn(prev => (prev + (skipCount * finalDirection) + currentPlayers.length) % currentPlayers.length);
       return currentPlayers;
     });
     setSelectedCardsIds([]);
     setUnoDeclared(false);
-    setTimeLeft(turnTimeLimit);
-  }, [direction, turnTimeLimit]);
+    
+    // Reset or apply Rage/Panic time limit
+    if (rageEffect) {
+       setTimeLeft(3); // Panic mode
+       setRageEffect(false);
+    } else {
+       setTimeLeft(turnTimeLimit);
+    }
+  }, [direction, turnTimeLimit, currentArenaIndex, rageEffect]);
 
   const drawCard = useCallback((playerIndex: number, count = 1) => {
     let cardsToDraw: Card[] = [];
     sounds.playCardPlay();
+    if (playerIndex === 0) triggerKingCommentary("Reforço Real!");
+    
     setDeck(prevDeck => {
       const newDeck = [...prevDeck];
       cardsToDraw = newDeck.splice(0, count);
-      if (newDeck.length === 0) return createDeck(profile.activeDeck);
-      return newDeck;
+      return newDeck.length === 0 && profile ? createDeck(profile.activeDeck) : newDeck;
     });
-    setPlayers(prevPlayers => {
-      if (!prevPlayers[playerIndex]) return prevPlayers;
-      return prevPlayers.map((p, idx) => {
-        if (idx === playerIndex) return { ...p, cards: [...p.cards, ...cardsToDraw] };
-        return p;
-      });
-    });
-    return cardsToDraw;
-  }, [profile.activeDeck]);
-
-  const handleTimeOut = useCallback(() => {
-    if (isProcessing) return;
-    drawCard(turn, 1);
-    nextTurn();
-  }, [isProcessing, drawCard, nextTurn, turn]);
-
-  useEffect(() => {
-    if (isProcessing || players.length === 0 || showColorPicker || showQuitConfirm) {
-      if (timerRef.current) clearInterval(timerRef.current);
-      return;
-    }
-    
-    timerRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) { 
-          setTimeout(handleTimeOut, 0);
-          return 0; 
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [turn, isProcessing, handleTimeOut, showColorPicker, players.length, showQuitConfirm]);
+    setPlayers(prevPlayers => prevPlayers.map((p, idx) => idx === playerIndex ? { ...p, cards: [...p.cards, ...cardsToDraw] } : p));
+  }, [profile]);
 
   const executePlay = useCallback((playerIndex: number, cards: Card[], chosenColor?: CardColor) => {
     setIsProcessing(true);
     sounds.playCardPlay();
     
-    setPlayers(prevPlayers => {
-      if (!prevPlayers[playerIndex]) return prevPlayers;
-      const lastCard = cards[cards.length - 1];
+    const topCardBefore = discardPile[discardPile.length - 1];
+    let cardsToExecute = [...cards];
 
+    // HABILIDADE ESPELHO: Repetir a última carta
+    if (cardsToExecute.length === 1 && cardsToExecute[0].type === CardType.WILD) {
+       const mirror = { ...cardsToExecute[0] };
+       mirror.type = topCardBefore.type;
+       mirror.value = topCardBefore.value;
+       mirror.label = `Espelho de ${topCardBefore.label}`;
+       cardsToExecute = [mirror];
+       triggerKingCommentary("Espelho Real!");
+    }
+
+    const lastCard = cardsToExecute[cardsToExecute.length - 1];
+
+    setPlayers(prevPlayers => {
       const updatedPlayers = prevPlayers.map((p, idx) => {
         if (idx === playerIndex) {
           const newHand = p.cards.filter(c => !cards.some(played => played.instanceId === c.instanceId));
-          if (playerIndex === 0 && newHand.length === 1 && !unoDeclared) setTimeout(() => drawCard(0, 2), 400);
+          if (playerIndex === 0 && newHand.length === 1 && !unoDeclared) {
+             setTimeout(() => { drawCard(0, 2); triggerKingCommentary("Esqueceu o Grito!"); }, 400);
+          }
           return { ...p, cards: newHand };
         }
         return p;
@@ -167,175 +196,245 @@ const GameView: React.FC = () => {
       let skip = 1;
       let colorToSet: CardColor = lastCard.color === 'Especial' ? (chosenColor || getRandomColor()) : lastCard.color;
 
-      if (lastCard.type === CardType.SKIP) { sounds.playFreeze(); setFreezeOverlay(true); setTimeout(() => setFreezeOverlay(false), 800); skip = 2; }
-      else if (lastCard.type === CardType.REVERSE) { sounds.playReverse(); setIsShaking(true); setTimeout(() => setIsShaking(false), 500); setDirection(prev => prev * -1); }
-      else if (lastCard.type === CardType.DRAW2) { const vIdx = (playerIndex + (1 * direction) + updatedPlayers.length) % updatedPlayers.length; setTimeout(() => drawCard(vIdx, 2), 500); skip = 2; }
-      else if (lastCard.type === CardType.DRAW4) { const vIdx = (playerIndex + (1 * direction) + updatedPlayers.length) % updatedPlayers.length; setTimeout(() => drawCard(vIdx, 4), 500); skip = 2; colorToSet = chosenColor || getRandomColor(); }
+      if (lastCard.type === CardType.SKIP) { 
+        sounds.playFreeze(); 
+        setFreezeOverlay(true); 
+        setTimeout(() => setFreezeOverlay(false), 800); 
+        skip = 2; 
+      }
+      else if (lastCard.type === CardType.REVERSE) { 
+        setDirection(prev => prev * -1); 
+      }
+      else if (lastCard.type === CardType.DRAW4) { 
+        const vIdx = (playerIndex + (1 * direction) + updatedPlayers.length) % updatedPlayers.length; 
+        setTimeout(() => drawCard(vIdx, 4), 500); 
+        setRageEffect(true); // Proxima rodada será curta (Pânico)
+        skip = 2; 
+        triggerKingCommentary("Pânico Total!");
+      }
+      else if (lastCard.type === CardType.DRAW2) {
+        const vIdx = (playerIndex + (1 * direction) + updatedPlayers.length) % updatedPlayers.length; 
+        setTimeout(() => drawCard(vIdx, 2), 500); 
+      }
 
-      setDiscardPile(prev => [...prev, ...cards]);
+      setDiscardPile(prev => [...prev, ...cardsToExecute]);
       setCurrentColor(colorToSet);
 
       if (updatedPlayers[playerIndex].cards.length === 0) {
-        const goldBase = isBossBattle ? 1000 : 200;
-        const gems = isBossBattle ? 50 : 5;
-        const potWon = activeRoom ? (activeRoom.betAmount * activeRoom.maxPlayers) : 0;
-        
-        setLastRewards({ gold: goldBase, gems, bonus: 0, chestAcquired: true, potWon });
-        if (playerIndex === 0) { sounds.playVictory(); setGameStatus(GameStatus.VICTORY); }
-        else { sounds.playDefeat(); setGameStatus(GameStatus.DEFEAT); }
-        updateTrophies(playerIndex === 0 ? (isBossBattle ? 100 : 30) : -15);
+        setTimeout(() => {
+           if (profile) setLastRewards({ gold: isBossBattle ? 1000 : 200, gems: isBossBattle ? 50 : 5, bonus: 0, chestAcquired: true });
+           setGameStatus(playerIndex === 0 ? GameStatus.VICTORY : GameStatus.DEFEAT);
+           updateTrophies(playerIndex === 0 ? 30 : -15);
+        }, 500);
       } else {
-        setTimeout(() => { setIsProcessing(false); nextTurn(skip); }, 600);
+        // ARENA 5 POWER: Double play for bots
+        const isDoublePlayArena = currentArenaIndex === 4;
+        const botCanDoublePlay = updatedPlayers[playerIndex].isBot && isDoublePlayArena && Math.random() < 0.4;
+        
+        if (botCanDoublePlay) {
+           triggerKingCommentary("Dobro de Magia!");
+           setTimeout(() => setIsProcessing(false), 300);
+        } else {
+           setTimeout(() => { setIsProcessing(false); nextTurn(skip); }, 600);
+        }
       }
       return updatedPlayers;
     });
-  }, [setGameStatus, updateTrophies, setLastRewards, nextTurn, drawCard, direction, unoDeclared, isBossBattle, activeRoom]);
-
-  const confirmPlay = () => {
-    if (isProcessing || players.length === 0) return;
-    const playerHand = players[0].cards;
-    const selected = selectedCardsIds.map(id => playerHand.find(c => c.instanceId === id)!).filter(Boolean);
-    const topCard = discardPile[discardPile.length - 1];
-    if (isValidCombo(selected, topCard, currentColor, turn === 0)) {
-       const lastCard = selected[selected.length - 1];
-       if (lastCard.color === 'Especial' || lastCard.type === CardType.DRAW4) { setPendingCards(selected); setShowColorPicker(true); } 
-       else { executePlay(0, selected); }
-    }
-  };
-
-  const handleColorPick = (color: CardColor) => {
-    sounds.playClick();
-    if (pendingCards) {
-      executePlay(0, pendingCards, color);
-      setPendingCards(null);
-      setShowColorPicker(false);
-    }
-  };
+  }, [profile, isBossBattle, direction, unoDeclared, drawCard, nextTurn, setGameStatus, updateTrophies, currentArenaIndex, discardPile]);
 
   useEffect(() => {
-    if (players.length > 0 && players[turn]?.isBot && !isProcessing && !showColorPicker && !showQuitConfirm) {
-      const botHand = [...players[turn].cards];
-      const moves = getBotMove(botHand, discardPile[discardPile.length - 1], currentColor, currentArenaIndex);
-      const timer = setTimeout(() => {
+    if (players[turn]?.isBot && !isProcessing && !showColorPicker && discardPile.length > 0) {
+      const moves = getBotMove(players[turn].cards, discardPile[discardPile.length - 1], currentColor);
+      
+      // Bot random emote
+      if (Math.random() < 0.1) {
+        const botEmotes = ['😂', '😠', '👍', '😭'];
+        sendEmote(botEmotes[Math.floor(Math.random()*4)], turn);
+      }
+
+      setTimeout(() => {
         if (moves.length > 0) executePlay(turn, moves);
         else { drawCard(turn, 1); nextTurn(); }
-      }, 1000);
-      return () => clearTimeout(timer);
+      }, 1200);
     }
-  }, [turn, isProcessing, players, currentColor, discardPile, drawCard, executePlay, nextTurn, showColorPicker, showQuitConfirm, currentArenaIndex]);
+  }, [turn, isProcessing, currentColor, discardPile, players, showColorPicker, executePlay, drawCard, nextTurn]);
 
-  if (players.length === 0) return null;
+  useEffect(() => {
+    if (timeLeft > 0 && !isProcessing && gameStatus === GameStatus.BATTLE) {
+      const timer = setTimeout(() => setTimeLeft(prev => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (timeLeft === 0 && turn === 0) {
+      drawCard(0, 1);
+      nextTurn();
+    }
+  }, [timeLeft, turn, isProcessing, gameStatus, drawCard, nextTurn]);
 
-  const hand = players[0]?.cards || [];
-  const dynamicSpacing = hand.length > 6 ? Math.max(-78, -48 - (hand.length - 6) * 2.5) : -48;
-
-  const handleConfirmQuit = () => {
-    sounds.playClick();
-    quitGame();
+  const getCardPosition = (index: number, total: number, isSelected: boolean) => {
+    const mid = (total - 1) / 2;
+    const diff = index - mid;
+    if (isSelected) return { transform: 'translateY(-180px) scale(1.15) rotate(0deg)', zIndex: 1000 };
+    const baseSpread = isLandscape ? 45 : 35;
+    const squeezingFactor = total > 7 ? (8 / total) : 1;
+    const dynamicSpread = baseSpread * squeezingFactor;
+    const rotation = diff * (isLandscape ? 22 : 15) / (mid || 1);
+    const translateY = Math.pow(Math.abs(diff), 2) * (isLandscape ? 2.0 : 1.6);
+    const translateX = diff * dynamicSpread;
+    return {
+      transform: `translateX(${translateX}px) translateY(${translateY}px) rotate(${rotation}deg)`,
+      zIndex: 100 + index
+    };
   };
 
+  const topDiscardCard = discardPile[discardPile.length - 1];
+
   return (
-    <div className={`h-screen w-full ${activeRoom ? 'bg-[#0b1421]' : arena.bgColor} relative flex flex-col items-center justify-between overflow-hidden ${isShaking ? 'animate-shake' : ''} will-change-contents`}>
-      {freezeOverlay && <div className="absolute inset-0 z-[150] bg-cyan-400/10 pointer-events-none"></div>}
-      
-      {/* HUD Superior */}
-      <div className="w-full flex justify-between items-center px-6 pt-6 z-10">
-        <button onClick={() => { sounds.playClick(); setShowQuitConfirm(true); }} className="w-12 h-12 bg-black/40 rounded-2xl border-2 border-white/10 flex items-center justify-center text-xl active:scale-90 transition-transform">🚪</button>
-        <div className="flex gap-6">
+    <div className={`h-screen w-full ${arena.bgColor} relative flex flex-col items-center justify-between overflow-hidden select-none`}>
+      {freezeOverlay && <div className="absolute inset-0 z-[200] bg-cyan-400/10 backdrop-blur-[2px] pointer-events-none transition-all duration-700"></div>}
+
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[500]">
+        {kingCommentary && (
+          <div key={kingCommentary.id} className="animate-king-whisper text-center px-4">
+             <span className="text-5xl sm:text-7xl font-black clash-text italic uppercase text-white drop-shadow-[0_0_20px_rgba(0,0,0,1)] tracking-tighter">
+                {kingCommentary.text}
+             </span>
+          </div>
+        )}
+      </div>
+
+      <div className="w-full flex justify-between items-start px-6 pt-8 z-[300] shrink-0 landscape:pt-4">
+        <button onClick={() => setGameStatus(GameStatus.MENU)} className="w-12 h-12 bg-black/70 rounded-2xl border-2 border-white/10 flex items-center justify-center text-xl shadow-2xl active:scale-90 transition-transform">🚪</button>
+        <div className="flex gap-6 sm:gap-12">
           {players.slice(1).map((bot, idx) => (
-            <div key={bot.id} className={`flex flex-col items-center transition-all ${turn === idx + 1 ? 'scale-110' : 'opacity-40'}`}>
-              <div className={`w-12 h-12 rounded-full border-[3px] ${turn === idx + 1 ? 'border-yellow-400 bg-blue-700' : 'border-white/30 bg-gray-800'} flex items-center justify-center text-2xl shadow-lg`}>{bot.avatar}</div>
-              <div className="text-white text-[9px] font-black mt-1 bg-black/60 px-2 rounded-full">{bot.cards.length}</div>
+            <div key={bot.id} className={`flex flex-col items-center transition-all relative ${turn === idx + 1 ? 'scale-110' : 'opacity-40 grayscale'}`}>
+              {bot.emote && (
+                <div className="absolute -top-12 bg-white rounded-2xl px-3 py-1 text-2xl shadow-xl animate-bounce z-50">
+                  {bot.emote}
+                  <div className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-white rotate-45"></div>
+                </div>
+              )}
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-4 border-white/20 bg-gray-900 flex items-center justify-center text-2xl shadow-xl relative">
+                {bot.avatar}
+                {turn === idx + 1 && <div className="absolute -inset-1 rounded-full border-2 border-yellow-400 animate-ping"></div>}
+              </div>
+              <div className="mt-1 bg-black/80 px-2 py-0.5 rounded-full border border-white/10"><span className="text-white text-[10px] font-black">{bot.cards.length}</span></div>
             </div>
           ))}
         </div>
-        <div className="flex flex-col items-end">
-           {activeRoom && (
-             <div className="bg-emerald-600/20 border border-emerald-500/40 px-3 py-1 rounded-xl flex items-center gap-2">
-                <span className="text-[10px] font-black text-emerald-400">{activeRoom.betAmount * activeRoom.maxPlayers}</span>
-                <span className="text-xs">💎</span>
-             </div>
-           )}
-        </div>
+        
+        {/* EMOTE PICKER TRIGGER */}
+        <button 
+          onClick={() => setShowEmotePicker(!showEmotePicker)} 
+          className="w-12 h-12 bg-blue-600/80 rounded-2xl border-2 border-white/10 flex items-center justify-center text-xl shadow-2xl active:scale-90 transition-transform"
+        >
+          💬
+        </button>
       </div>
 
-      {/* Área Central */}
-      <div className="flex-1 flex flex-col items-center justify-center relative w-full gap-12">
-         {activeRoom && <div className="absolute top-10 text-[10px] font-black uppercase tracking-[0.5em] opacity-30 italic">{activeRoom.arenaName}</div>}
-         <div className="flex items-center gap-16">
-            <div onClick={() => !isProcessing && turn === 0 && !showColorPicker && drawCard(0, 1) && nextTurn()} className={`transition-all active:scale-95 ${turn === 0 ? 'opacity-100 cursor-pointer' : 'opacity-50 pointer-events-none'}`}>
+      {showEmotePicker && (
+         <div className="absolute top-24 right-6 grid grid-cols-2 gap-2 bg-black/80 p-3 rounded-3xl border border-white/10 z-[600] animate-in zoom-in duration-200">
+            {['😂', '😠', '👍', '😭'].map(e => (
+               <button key={e} onClick={() => { sendEmote(e, 0); setShowEmotePicker(false); }} className="w-12 h-12 flex items-center justify-center text-2xl hover:scale-125 transition-transform">{e}</button>
+            ))}
+         </div>
+      )}
+
+      <div className="flex-1 w-full flex items-center justify-center relative z-10 scale-90 sm:scale-100 landscape:scale-75">
+         <div className="flex items-center gap-12 sm:gap-24">
+            <div onClick={() => turn === 0 && !isProcessing && drawCard(0, 1) && nextTurn()} className={`relative group ${turn === 0 ? 'cursor-pointer hover:scale-105 active:scale-95' : 'opacity-40 pointer-events-none'} transition-all`}>
                <ClashCard card={{} as any} hidden size="md" />
+               {turn === 0 && <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-blue-600 px-4 py-1 rounded-full text-[10px] font-black animate-bounce text-white shadow-lg">COMPRAR</div>}
             </div>
-            <div className="relative">
-              <ClashCard card={discardPile[discardPile.length - 1]} size="lg" />
-              <div className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-5 py-1 rounded-full text-[9px] text-white font-black border-2 border-white/20 uppercase shadow-lg ${currentColor === 'Vermelho' ? 'bg-red-600' : currentColor === 'Azul' ? 'bg-blue-600' : currentColor === 'Amarelo' ? 'bg-yellow-500 text-black' : 'bg-green-600'}`}>{currentColor}</div>
+            
+            <div className={`relative ${currentColor === 'Vermelho' ? 'glow-red' : currentColor === 'Azul' ? 'glow-blue' : currentColor === 'Amarelo' ? 'glow-yellow' : 'glow-green'} rounded-[40px] p-2 transition-all duration-700`}>
+              {topDiscardCard && <div className="drop-shadow-[0_20px_50px_rgba(0,0,0,0.9)]"><ClashCard card={topDiscardCard} size="lg" /></div>}
+              <div className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-8 py-1.5 rounded-full border-2 border-white/30 shadow-2xl z-20 transition-colors duration-500 ${currentColor === 'Vermelho' ? 'bg-red-600' : currentColor === 'Azul' ? 'bg-blue-600' : currentColor === 'Amarelo' ? 'bg-yellow-500' : 'bg-green-600'}`}>
+                <span className="text-[10px] font-black italic uppercase text-white tracking-widest">{currentColor}</span>
+              </div>
             </div>
          </div>
       </div>
 
-      {/* Modal de Cor */}
+      <div className="w-full h-[35vh] sm:h-[40vh] relative flex flex-col items-center justify-end overflow-visible z-[400] pb-6">
+        {/* PLAYER EMOTE BUBBLE */}
+        {players[0]?.emote && (
+          <div className="absolute top-[-40px] bg-white rounded-2xl px-6 py-2 text-3xl shadow-2xl animate-bounce z-[700]">
+             {players[0].emote}
+             <div className="absolute bottom-[-8px] left-1/2 -translate-x-1/2 w-4 h-4 bg-white rotate-45"></div>
+          </div>
+        )}
+
+        {selectedCardsIds.length > 0 && turn === 0 && (
+          <div className="absolute top-0 flex justify-center w-full z-[1200] px-6 pointer-events-none">
+            <button 
+              onClick={() => {
+                const playerHand = players[0].cards;
+                const selected = selectedCardsIds.map(id => playerHand.find(c => c.instanceId === id)!).filter(Boolean);
+                if (selected.length > 0 && isValidCombo(selected, topDiscardCard, currentColor, turn === 0)) {
+                  if (selected[0].color === 'Especial' && selected[0].type === CardType.DRAW4) { setPendingCards(selected); setShowColorPicker(true); }
+                  else if (selected[0].color === 'Especial' && selected[0].type === CardType.WILD) { executePlay(0, selected); } // Mirror copies, doesn't pick color
+                  else if (selected[0].color === 'Especial') { setPendingCards(selected); setShowColorPicker(true); }
+                  else executePlay(0, selected);
+                }
+              }} 
+              className="pointer-events-auto bg-yellow-400 px-20 py-4 rounded-[50px] border-b-[6px] border-yellow-800 font-black clash-text italic text-2xl uppercase text-black active:translate-y-1 active:border-b-0 shadow-2xl animate-in zoom-in duration-300 w-full max-w-sm"
+            >
+              JOGAR!
+            </button>
+          </div>
+        )}
+
+        <div className="relative w-full h-[180px] flex items-center justify-center overflow-visible mb-16">
+           {players[0]?.cards.map((card, i) => {
+              const isSelected = selectedCardsIds.includes(card.instanceId);
+              const isPlayable = isCardPlayable(card, topDiscardCard, currentColor);
+              const total = players[0].cards.length;
+              const pos = getCardPosition(i, total, isSelected);
+              return (
+                <div key={card.instanceId} className="absolute bottom-0 transition-all duration-300 transform-gpu cursor-pointer" style={{ ...pos }} onClick={() => { sounds.playClick(); setSelectedCardsIds(prev => prev.includes(card.instanceId) ? prev.filter(id => id !== card.instanceId) : [...prev, card.instanceId]); }}>
+                  <ClashCard card={card} size={isLandscape ? "md" : "sm"} selected={isSelected} playable={isPlayable} />
+                </div>
+              );
+           })}
+        </div>
+
+        <div className="w-full max-w-4xl px-4 flex justify-between items-center z-[1100] landscape:px-12">
+           <div className="flex items-center gap-4 bg-black/90 backdrop-blur-2xl rounded-[40px] p-4 border border-white/10 shadow-2xl flex-1 max-w-[360px]">
+              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-3xl border-2 border-white/10 shadow-lg">👑</div>
+              <div className="flex flex-col flex-1 overflow-hidden">
+                 <span className={`text-[10px] font-black uppercase tracking-widest truncate ${turn === 0 ? 'text-yellow-400' : 'text-white/30'}`}>
+                   {turn === 0 ? 'SUA VEZ!' : 'RIVAL JOGANDO...'}
+                 </span>
+                 <TurnTimer timeLeft={timeLeft} totalTime={turnTimeLimit} isUrgent={timeLeft <= 3} />
+              </div>
+           </div>
+
+           <button 
+             onClick={() => { 
+                sounds.playClick(); 
+                if(players[0]?.cards.length <= 2) {
+                  setUnoDeclared(true);
+                  triggerKingCommentary("Grito de Guerra!");
+                }
+             }} 
+             className={`ml-4 px-12 py-5 rounded-[35px] font-black clash-text italic text-xl transition-all shadow-2xl transform active:scale-95 ${unoDeclared ? 'bg-green-500 border-b-[8px] border-green-900 scale-105' : 'bg-red-600 border-b-[8px] border-red-900'}`}
+           >
+             UNO!
+           </button>
+        </div>
+      </div>
+
       {showColorPicker && (
-        <div className="absolute inset-0 z-[500] bg-black/80 flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-black/90 p-8 rounded-[40px] border-2 border-white/20 flex flex-col items-center gap-6 shadow-2xl">
-             <span className="text-white font-black text-xs uppercase italic tracking-widest opacity-60">Escolha uma Cor</span>
-             <div className="flex gap-4">
-                {COLORS.map(color => (
-                   <button key={color} onClick={() => handleColorPick(color)} className={`w-16 h-16 rounded-2xl border-4 border-white/40 active:scale-90 transition-all ${color === 'Vermelho' ? 'bg-red-600' : color === 'Azul' ? 'bg-blue-600' : color === 'Amarelo' ? 'bg-yellow-400' : 'bg-green-600'}`} />
+        <div className="fixed inset-0 z-[2000] bg-black/95 flex items-center justify-center p-6 animate-in fade-in duration-500">
+          <div className="bg-gradient-to-b from-[#1a2b45] to-[#0b1421] w-full max-w-sm p-12 rounded-[70px] border-4 border-yellow-400 flex flex-col items-center gap-10 shadow-[0_0_150px_rgba(0,0,0,1)]">
+             <span className="text-white font-black text-2xl uppercase italic tracking-widest text-center">DOMÍNIO REAL</span>
+             <div className="grid grid-cols-2 gap-8 w-full">
+                {COLORS.map(c => (
+                   <button key={c} onClick={() => { if(pendingCards) executePlay(0, pendingCards, c); setShowColorPicker(false); triggerKingCommentary(`Reino ${c}!`); }} className={`h-24 rounded-[40px] border-4 border-white/10 active:scale-90 transition-all shadow-xl ${c === 'Vermelho' ? 'bg-red-600' : c === 'Azul' ? 'bg-blue-600' : c === 'Amarelo' ? 'bg-yellow-400' : 'bg-green-600'}`} />
                 ))}
              </div>
           </div>
         </div>
       )}
-
-      {/* Modal de Sair */}
-      {showQuitConfirm && (
-        <div className="absolute inset-0 z-[600] bg-black/90 flex items-center justify-center p-6 animate-in fade-in duration-300">
-           <div className="bg-[#1a2b45] w-full max-w-sm rounded-[40px] border-4 border-red-500 p-8 flex flex-col items-center text-center shadow-2xl">
-              <div className="text-5xl mb-4">🚪</div>
-              <h3 className="text-2xl font-black clash-text italic uppercase text-white mb-2">Abandonar Partida?</h3>
-              <p className="text-white/60 text-xs font-bold uppercase mb-8 leading-relaxed">
-                {isRanked && !activeRoom ? 'Se você sair agora, perderá 15 troféus como penalidade real.' : 'Tem certeza que deseja encerrar o contrato atual?'}
-              </p>
-              <div className="w-full flex flex-col gap-3">
-                 <button onClick={handleConfirmQuit} className="w-full py-4 bg-red-600 border-b-6 border-red-900 rounded-2xl font-black clash-text italic text-lg uppercase text-white active:translate-y-1 active:border-b-0">SAIR AGORA</button>
-                 <button onClick={() => { sounds.playClick(); setShowQuitConfirm(false); }} className="w-full py-3 text-white/40 font-black italic text-[10px] uppercase tracking-widest">CONTINUAR LUTANDO</button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* HUD Inferior */}
-      <div className="w-full max-w-full z-20 pb-4 px-2 relative">
-        {selectedCardsIds.length > 0 && (
-          <div className="absolute -top-16 left-1/2 -translate-x-1/2 z-50">
-            <button onClick={confirmPlay} className="bg-yellow-500 px-12 py-3 rounded-2xl border-b-6 border-yellow-800 font-black clash-text italic text-xl uppercase text-black active:translate-y-1 active:border-b-0">JOGAR</button>
-          </div>
-        )}
-        
-        <div className="flex justify-center items-end h-64 overflow-x-auto no-scrollbar px-10 pt-16 relative">
-          <div className="inline-flex items-end min-w-max">
-            {hand.map((card, idx) => (
-              <div key={card.instanceId} className="animate-card-fly-in" style={{ animationDelay: `${idx * 30}ms`, marginLeft: idx === 0 ? 0 : `${dynamicSpacing}px`, zIndex: selectedCardsIds.includes(card.instanceId) ? 100 : idx }}>
-                <ClashCard card={card} size="md" selected={selectedCardsIds.includes(card.instanceId)} playable={isCardPlayable(card, discardPile[discardPile.length - 1], currentColor)} onClick={() => {
-                  sounds.playClick();
-                  setSelectedCardsIds(prev => prev.includes(card.instanceId) ? prev.filter(id => id !== card.instanceId) : [...prev, card.instanceId]);
-                }} />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-[#1a2b45] rounded-[30px] px-8 py-4 border-t-4 border-blue-400 flex justify-between items-center shadow-2xl mx-auto max-w-lg mt-2">
-          <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${turn === 0 ? 'bg-blue-600 border-2 border-yellow-400' : 'bg-blue-900'}`}>👑</div>
-            <div className="flex flex-col">
-              <span className="text-white/40 text-[8px] font-black uppercase tracking-widest">{turn === 0 ? 'Sua Vez' : 'Aguarde...'}</span>
-              <TurnTimer timeLeft={timeLeft} totalTime={turnTimeLimit} />
-            </div>
-          </div>
-          <button onClick={() => { sounds.playClick(); if (players[0]?.cards.length <= 2) setUnoDeclared(true); }} className={`px-6 py-2 rounded-full font-black clash-text italic transition-all ${unoDeclared ? 'bg-green-600 opacity-60' : 'bg-red-600 border-b-4 border-red-900 active:translate-y-1 active:border-b-0'}`}>UNO!</button>
-        </div>
-      </div>
     </div>
   );
 };

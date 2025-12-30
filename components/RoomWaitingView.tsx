@@ -5,7 +5,7 @@ import { GameStatus } from '../types.ts';
 import { sounds } from '../logic/soundManager.ts';
 
 const RoomWaitingView: React.FC = () => {
-  const { activeRoom, profile, startGame, quitGame, session } = useGameStore();
+  const { activeRoom, profile, startGame, quitGame, session, setGameStatus } = useGameStore();
   const [dots, setDots] = useState('');
 
   useEffect(() => {
@@ -23,6 +23,12 @@ const RoomWaitingView: React.FC = () => {
   const handleLeave = () => {
     sounds.playClick();
     quitGame();
+  };
+
+  const handleEdit = () => {
+    sounds.playClick();
+    // Volta para o Lobby no modo de edição (o LobbyView detecta a sala ativa)
+    setGameStatus(GameStatus.LOBBY);
   };
 
   const handleStart = () => {
@@ -67,13 +73,21 @@ const RoomWaitingView: React.FC = () => {
 
         <div className="w-full flex flex-col gap-4">
            {isCreator ? (
-             <button 
-               onClick={handleStart}
-               disabled={!readyToStart}
-               className="w-full py-5 bg-yellow-500 rounded-2xl border-b-8 border-yellow-800 font-black clash-text italic text-xl uppercase text-black active:translate-y-2 active:border-b-0 shadow-xl disabled:grayscale disabled:opacity-50"
-             >
-               INICIAR BATALHA
-             </button>
+             <>
+               <button 
+                 onClick={handleStart}
+                 disabled={!readyToStart}
+                 className="w-full py-5 bg-yellow-500 rounded-2xl border-b-8 border-yellow-800 font-black clash-text italic text-xl uppercase text-black active:translate-y-2 active:border-b-0 shadow-xl disabled:grayscale disabled:opacity-50"
+               >
+                 INICIAR BATALHA
+               </button>
+               <button 
+                 onClick={handleEdit}
+                 className="w-full py-4 bg-blue-600 rounded-2xl border-b-6 border-blue-900 font-black clash-text italic text-sm uppercase text-white active:translate-y-1 active:border-b-0 shadow-lg"
+               >
+                 AJUSTAR CONTRATO
+               </button>
+             </>
            ) : (
              <div className="w-full py-5 bg-blue-900/40 rounded-2xl border border-white/10 font-black clash-text italic text-sm uppercase text-white/60 animate-pulse">
                 AGUARDANDO O REI...

@@ -10,6 +10,7 @@ import ResultOverlay from './components/ResultOverlay.tsx';
 import LobbyView from './components/LobbyView.tsx';
 import AuthView from './components/AuthView.tsx';
 import RoomWaitingView from './components/RoomWaitingView.tsx';
+import LeaderboardView from './components/LeaderboardView.tsx';
 
 const App: React.FC = () => {
   const { gameStatus, profile, session, initialize, signOut } = useGameStore();
@@ -22,14 +23,14 @@ const App: React.FC = () => {
       } catch (err) {
         console.error("Erro fatal durante a inicialização:", err);
       } finally {
-        setTimeout(() => setIsInitializing(false), 500);
+        setTimeout(() => setIsInitializing(false), 800);
       }
     };
     
     initApp();
   }, [initialize]);
 
-  if (isInitializing) {
+  if (isInitializing || (session && !profile)) {
     return (
       <div className="w-full h-screen bg-[#0b1421] flex flex-col items-center justify-center p-6 text-center">
         <div className="relative mb-12">
@@ -42,7 +43,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (!session || !profile) {
+  if (!session) {
     return <AuthView />;
   }
 
@@ -53,6 +54,7 @@ const App: React.FC = () => {
       {gameStatus === GameStatus.ARENA_SELECTION && <ArenaSelectionView />}
       {gameStatus === GameStatus.LOBBY && <LobbyView />}
       {gameStatus === GameStatus.ROOM_WAITING && <RoomWaitingView />}
+      {gameStatus === GameStatus.LEADERBOARD && <LeaderboardView />}
       {(gameStatus === GameStatus.BATTLE || gameStatus === GameStatus.VICTORY || gameStatus === GameStatus.DEFEAT) && (
         <>
           <GameView />

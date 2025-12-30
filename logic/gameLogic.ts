@@ -1,5 +1,5 @@
 
-import { Card, CardType, CardColor } from '../types';
+import { Card, CardType, CardColor, CardInstance } from '../types';
 import { COLORS, ALL_CARDS } from '../constants';
 
 export const createDeck = (playerDeckIds?: string[]): Card[] => {
@@ -48,7 +48,8 @@ export const createDeck = (playerDeckIds?: string[]): Card[] => {
   return deck.sort(() => Math.random() - 0.5);
 };
 
-export const isCardPlayable = (card: Card, topCard: Card, currentColor: CardColor): boolean => {
+export const isCardPlayable = (card: Card, topCard: Card | undefined, currentColor: CardColor): boolean => {
+  if (!card || !topCard) return false;
   if (card.color === 'Especial') return true;
   if (card.color === currentColor) return true;
   if (card.type === topCard.type && card.type !== CardType.NUMBER) return true;
@@ -56,22 +57,13 @@ export const isCardPlayable = (card: Card, topCard: Card, currentColor: CardColo
   return false;
 };
 
-export const isExactMatch = (card: Card, topCard: Card, currentColor: CardColor): boolean => {
-  if (card.color === 'Especial') return false;
-  const isSameValue = card.type === CardType.NUMBER 
-    ? (topCard.type === CardType.NUMBER && card.value === topCard.value)
-    : (card.type === topCard.type);
-  const isSameColor = card.color === currentColor;
-  return isSameValue && isSameColor;
-};
-
-export const isValidCombo = (selectedCards: Card[], topCard: Card, currentColor: CardColor, isMyTurn: boolean): boolean => {
-  if (selectedCards.length === 0) return false;
+export const isValidCombo = (selectedCards: Card[], topCard: Card | undefined, currentColor: CardColor, isMyTurn: boolean): boolean => {
+  if (selectedCards.length === 0 || !topCard) return false;
   const firstCard = selectedCards[0];
-  const canStart = isMyTurn 
-    ? isCardPlayable(firstCard, topCard, currentColor)
-    : isExactMatch(firstCard, topCard, currentColor);
+  
+  const canStart = isCardPlayable(firstCard, topCard, currentColor);
   if (!canStart) return false;
+
   for (let i = 1; i < selectedCards.length; i++) {
     const card = selectedCards[i];
     if (firstCard.type === CardType.NUMBER) {
@@ -79,33 +71,31 @@ export const isValidCombo = (selectedCards: Card[], topCard: Card, currentColor:
     } else {
       if (card.type !== firstCard.type) return false;
     }
+    if (card.color !== firstCard.color && card.color !== 'Especial') return false;
   }
   return true;
 };
 
-export const getBotMove = (hand: Card[], topCard: Card, currentColor: CardColor, botDifficulty: number = 0): Card[] => {
+export const getBotMove = (hand: Card[], topCard: Card | undefined, currentColor: CardColor, botDifficulty: number = 0): Card[] => {
+  if (!topCard) return [];
   const playable = hand.filter(c => isCardPlayable(c, topCard, currentColor));
   if (playable.length === 0) return [];
 
-  // Lógica de "Mãos de Elite" para arenas superiores
-  if (botDifficulty > 3) {
-    // Guarda o +4 e o Wild se tiver outras opções, a menos que esteja com poucas cartas
-    if (hand.length > 3) {
-      const normalOptions = playable.filter(c => c.color !== 'Especial');
-      if (normalOptions.length > 0) {
-        // Tenta jogar ações primeiro para atrapalhar
-        const actions = normalOptions.filter(c => c.type !== CardType.NUMBER);
-        if (actions.length > 0) return [actions[0]];
-        return [normalOptions[0]];
-      }
-    }
+  // Bots tentam priorizar combos de números
+  const numberPlayable = playable.filter(c => c.type === CardType.NUMBER);
+  if (numberPlayable.length > 0) {
+     const cardToPlay = numberPlayable[0];
+     const combo = hand.filter(c => c.type === CardType.NUMBER && c.value === cardToPlay.value && c.color === cardToPlay.color);
+     if (combo.length > 0) return combo;
   }
 
-  const firstCard = playable[0];
-  if (firstCard.type === CardType.NUMBER) {
-    return hand.filter(c => c.type === CardType.NUMBER && c.value === firstCard.value);
-  }
-  return [firstCard];
+  // Bots inteligentes guardam cartas especiais para o final
+  const normalCards = playable.filter(c => c.color !== 'Especial');
+  const specialCards = playable.filter(c => c.color === 'Especial');
+
+  let cardToPlay = normalCards.length > 0 ? normalCards[Math.floor(Math.random()*normalCards.length)] : specialCards[0];
+
+  return [cardToPlay];
 };
 
 export const getRandomColor = (): CardColor => {

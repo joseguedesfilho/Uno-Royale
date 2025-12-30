@@ -14,26 +14,27 @@ interface ClashCardProps {
 const ClashCard: React.FC<ClashCardProps> = memo(({ card, onClick, playable, selected, size = 'md', hidden }) => {
   const getRarityFrame = (rarity: Rarity) => {
     switch (rarity) {
-      case 'Comum': return 'border-[#b8bfc6] bg-[#5c6e80]';
-      case 'Rara': return 'border-[#e8a33a] bg-[#8a5b29]';
-      case 'Épica': return 'border-[#c658ed] bg-[#6c2c80]';
-      case 'Lendária': return 'border-[#5ce8e8] bg-[#2c7280]';
+      case 'Comum': return 'border-[#b8bfc6] bg-[#4a5a6a]';
+      case 'Rara': return 'border-[#e8a33a] bg-[#7a4b19]';
+      case 'Épica': return 'border-[#c658ed] bg-[#5c1c70]';
+      case 'Lendária': return 'border-[#5ce8e8] bg-[#1c6270] shadow-[0_0_15px_rgba(92,232,232,0.4)]';
       default: return 'border-white bg-gray-800';
     }
   };
 
   const getBgColor = (color: CardColor) => {
     switch (color) {
-      case 'Vermelho': return 'bg-gradient-to-b from-[#ff4d4d] to-[#b30000]';
-      case 'Azul': return 'bg-gradient-to-b from-[#4d94ff] to-[#0047b3]';
-      case 'Amarelo': return 'bg-gradient-to-b from-[#ffd633] to-[#cc9900]';
-      case 'Verde': return 'bg-gradient-to-b from-[#47d147] to-[#1f7a1f]';
-      case 'Especial': return 'bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-800';
+      case 'Vermelho': return 'bg-gradient-to-b from-[#ff5f5f] to-[#990000]';
+      case 'Azul': return 'bg-gradient-to-b from-[#5fafff] to-[#003780]';
+      case 'Amarelo': return 'bg-gradient-to-b from-[#ffe05f] to-[#997a00]';
+      case 'Verde': return 'bg-gradient-to-b from-[#5fff5f] to-[#006600]';
+      case 'Especial': return 'bg-gradient-to-br from-purple-700 via-indigo-800 to-black';
       default: return 'bg-[#111111]';
     }
   };
 
   const getCardSymbol = (card: Card) => {
+    if (!card || !card.type) return '';
     switch (card.type) {
       case CardType.SKIP: return '❄️';
       case CardType.REVERSE: return '🪵';
@@ -46,6 +47,7 @@ const ClashCard: React.FC<ClashCardProps> = memo(({ card, onClick, playable, sel
   };
 
   const getUnoReference = (card: Card) => {
+    if (!card || !card.type) return '';
     switch (card.type) {
       case CardType.SKIP: return '🚫';
       case CardType.REVERSE: return '⇄';
@@ -57,21 +59,22 @@ const ClashCard: React.FC<ClashCardProps> = memo(({ card, onClick, playable, sel
   };
 
   const dims = {
-    sm: 'w-[75px] h-[100px] text-xs',
-    md: 'w-24 h-36 text-sm',
-    lg: 'w-32 h-48 text-base'
+    sm: 'w-[70px] h-[105px] text-[10px]',
+    md: 'w-[90px] h-[130px] text-sm',
+    lg: 'w-[110px] h-[160px] sm:w-[130px] sm:h-[190px] text-base'
   }[size];
 
   if (hidden) {
     return (
-      <div className={`${dims} bg-[#0d1726] rounded-xl border-4 border-[#3558a7] flex items-center justify-center relative overflow-hidden shadow-xl will-change-transform`}>
-         <div className="w-[85%] h-[85%] flex flex-col items-center justify-center border-4 border-yellow-500 rounded-lg bg-blue-900/50">
-            <span className="text-white font-black text-xl italic tracking-tighter">UNO</span>
-            <span className="text-yellow-400 font-black text-[8px] uppercase">Royale</span>
+      <div className={`${dims} bg-[#0d1726] rounded-2xl border-[4px] border-[#3558a7] flex items-center justify-center relative overflow-hidden shadow-2xl`}>
+         <div className="w-[80%] h-[90%] flex flex-col items-center justify-center border-2 border-yellow-500 rounded-xl bg-blue-900/50">
+            <span className="text-white font-black text-2xl italic tracking-tighter transform-gpu -rotate-90">UNO</span>
          </div>
       </div>
     );
   }
+
+  if (!card || !card.id) return null;
 
   const symbol = getCardSymbol(card);
   const unoRef = getUnoReference(card);
@@ -84,41 +87,32 @@ const ClashCard: React.FC<ClashCardProps> = memo(({ card, onClick, playable, sel
       className={`
         ${dims} 
         ${rarityFrame}
-        rounded-xl border-[3px]
+        rounded-2xl border-[3px]
         flex flex-col items-center justify-between cursor-pointer
-        transition-all transform active:scale-95
-        relative overflow-hidden shadow-2xl will-change-transform
-        ${selected ? 'ring-4 ring-yellow-400 -translate-y-12 z-20' : 'hover:-translate-y-2'}
-        ${playable && !selected ? 'ring-2 ring-white/50' : ''}
+        transition-all duration-300 transform-gpu active:scale-95
+        relative overflow-hidden shadow-[0_12px_30px_rgba(0,0,0,0.7)]
+        ${selected ? 'ring-4 ring-yellow-400 -translate-y-4' : ''}
+        ${playable && !selected ? 'brightness-110 saturate-150' : ''}
+        ${!playable && !selected && !hidden ? 'grayscale brightness-50' : ''}
       `}
     >
-      <div className={`absolute inset-[3px] rounded-lg ${bgColor} shadow-inner`}></div>
-      <div className="absolute top-0 left-0 w-full h-1/2 bg-white/5 skew-y-[-10deg] -translate-y-2"></div>
+      <div className={`absolute inset-[3px] rounded-xl ${bgColor} shadow-inner`}></div>
+      
+      <div className="absolute top-1.5 left-2 font-black text-white italic text-lg drop-shadow-lg z-20">
+        {unoRef || symbol}
+      </div>
 
-      <div className="relative flex-1 w-full flex flex-col items-center justify-center z-10">
-        <div className="w-14 h-14 bg-white/10 rounded-full flex flex-col items-center justify-center backdrop-blur-none border border-white/10 shadow-lg">
-          <span className={`font-black italic drop-shadow-lg ${size === 'lg' ? 'text-4xl' : size === 'md' ? 'text-3xl' : 'text-2xl'} text-white`}>
+      <div className="relative flex-1 w-full flex flex-col items-center justify-center z-10 px-2">
+        <div className="w-[80%] aspect-square bg-white/5 rounded-full flex items-center justify-center border border-white/5 shadow-inner overflow-hidden">
+           <span className={`font-black italic drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)] ${size === 'lg' ? 'text-6xl' : size === 'md' ? 'text-4xl' : 'text-3xl'} text-white`}>
             {symbol}
           </span>
-          {unoRef && (
-            <span className="text-[10px] font-black text-white/90 -mt-1 drop-shadow-md">
-              {unoRef}
-            </span>
-          )}
         </div>
       </div>
 
-      <div className="absolute top-1 left-1.5 font-black text-white italic text-sm drop-shadow-md z-10 flex flex-col items-start leading-none">
-        <span>{unoRef || symbol}</span>
+      <div className="absolute bottom-1.5 right-2 font-black text-white italic text-lg drop-shadow-lg z-20 rotate-180">
+        {unoRef || symbol}
       </div>
-
-      <div className="absolute bottom-1 right-1.5 font-black text-white italic text-sm drop-shadow-md z-10 flex flex-col items-end leading-none rotate-180">
-        <span>{unoRef || symbol}</span>
-      </div>
-
-      {card.rarity === 'Lendária' && (
-        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-cyan-400/10 to-transparent animate-pulse pointer-events-none"></div>
-      )}
     </div>
   );
 });

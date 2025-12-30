@@ -39,7 +39,7 @@ export interface Chest {
   id: string;
   type: 'Prata' | 'Ouro' | 'Lendário';
   rarity: Rarity;
-  unlockTime: number; 
+  unlockTime: number; // Em milissegundos
   isOpening: boolean;
   startTime?: number;
 }
@@ -75,6 +75,16 @@ export interface LobbyPlayer {
   quote?: string;
 }
 
+export interface Quest {
+  id: string;
+  description: string;
+  target: number;
+  current: number;
+  rewardType: 'OURO' | 'GEMAS' | 'BAU';
+  rewardValue: any;
+  isClaimed: boolean;
+}
+
 export interface UserProfile {
   name: string;
   gold: number;
@@ -89,6 +99,14 @@ export interface UserProfile {
   claimedRewards: string[]; 
   isFirstTime: boolean;
   inventory: string[]; 
+  // Novos campos para Economia e Retenção
+  quests: Quest[];
+  passXP: number;
+  hasPremiumPass: boolean;
+  claimedPassFree: number[];
+  claimedPassPremium: number[];
+  profileBorder?: string;
+  profileBanner?: string;
 }
 
 export enum GameStatus {
@@ -100,7 +118,9 @@ export enum GameStatus {
   VICTORY = 'VITORIA',
   DEFEAT = 'DERROTA',
   TROPHY_ROAD = 'CAMINHO_TROFEUS',
-  ARENA_SELECTION = 'SELECAO_ARENA'
+  ARENA_SELECTION = 'SELECAO_ARENA',
+  LEADERBOARD = 'CLASSIFICACAO',
+  PASS_ROYALE = 'PASS_ROYALE'
 }
 
 export type ArenaTheme = {
@@ -112,16 +132,14 @@ export type ArenaTheme = {
   bossPower?: string;
 };
 
-// Fix: Added missing TrophyReward interface used in constants.tsx and store.ts
 export interface TrophyReward {
   id: string;
   trophiesRequired: number;
-  type: 'OURO' | 'BAU' | 'GEMAS' | 'CHEFE' | 'CARTA';
+  type: 'OURO' | 'BAU' | 'GEMAS' | 'CHEFE' | 'CARTA' | 'BORDA' | 'BANNER';
   value: string | number;
   label: string;
 }
 
-// Fix: Added missing ShopItem interface used in constants.tsx, store.ts, and MenuView.tsx
 export interface ShopItem {
   id: string;
   category: string;
