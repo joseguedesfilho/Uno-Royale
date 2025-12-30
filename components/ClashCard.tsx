@@ -35,12 +35,23 @@ const ClashCard: React.FC<ClashCardProps> = ({ card, onClick, playable, selected
 
   const getCardSymbol = (card: Card) => {
     switch (card.type) {
-      case CardType.SKIP: return '❄️'; // Gelo
+      case CardType.SKIP: return '❄️'; // Congelar
       case CardType.REVERSE: return '🪵'; // Tronco
-      case CardType.DRAW2: return '🧪'; // Fúria
-      case CardType.DRAW4: return '💀'; // Exército
+      case CardType.DRAW2: return '💀'; // Exército de Esqueletos
+      case CardType.DRAW4: return '🧪'; // Fúria
       case CardType.WILD: return '🪞'; // Espelho
       case CardType.NUMBER: return card.value?.toString();
+      default: return '';
+    }
+  };
+
+  const getUnoReference = (card: Card) => {
+    switch (card.type) {
+      case CardType.SKIP: return '🚫';
+      case CardType.REVERSE: return '⇄';
+      case CardType.DRAW2: return '+2';
+      case CardType.DRAW4: return '+4';
+      case CardType.WILD: return '🌈';
       default: return '';
     }
   };
@@ -63,6 +74,7 @@ const ClashCard: React.FC<ClashCardProps> = ({ card, onClick, playable, selected
   }
 
   const symbol = getCardSymbol(card);
+  const unoRef = getUnoReference(card);
   const rarityFrame = getRarityFrame(card.rarity);
   const bgColor = getBgColor(card.color);
 
@@ -87,17 +99,28 @@ const ClashCard: React.FC<ClashCardProps> = ({ card, onClick, playable, selected
       <div className="absolute top-0 left-0 w-full h-1/2 bg-white/10 skew-y-[-10deg] -translate-y-2"></div>
 
       {/* Symbol Area */}
-      <div className="relative flex-1 w-full flex items-center justify-center z-10">
-        <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20">
-          <span className={`font-black italic drop-shadow-lg ${size === 'lg' ? 'text-5xl' : size === 'md' ? 'text-4xl' : 'text-3xl'} text-white`}>
+      <div className="relative flex-1 w-full flex flex-col items-center justify-center z-10">
+        <div className="w-14 h-14 bg-white/20 rounded-full flex flex-col items-center justify-center backdrop-blur-sm border border-white/20 shadow-lg">
+          <span className={`font-black italic drop-shadow-lg ${size === 'lg' ? 'text-4xl' : size === 'md' ? 'text-3xl' : 'text-2xl'} text-white`}>
             {symbol}
           </span>
+          {unoRef && (
+            <span className="text-[10px] font-black text-white/90 -mt-1 drop-shadow-md">
+              {unoRef}
+            </span>
+          )}
         </div>
       </div>
 
       {/* Top Value Corner */}
-      <div className="absolute top-1 left-1.5 font-black text-white italic text-sm drop-shadow-md z-10">
-        {symbol}
+      <div className="absolute top-1 left-1.5 font-black text-white italic text-sm drop-shadow-md z-10 flex flex-col items-start leading-none">
+        <span>{unoRef || symbol}</span>
+        {unoRef && <span className="text-[8px] opacity-80">{symbol}</span>}
+      </div>
+
+      {/* Bottom Value Corner (Inverted) */}
+      <div className="absolute bottom-1 right-1.5 font-black text-white italic text-sm drop-shadow-md z-10 flex flex-col items-end leading-none rotate-180">
+        <span>{unoRef || symbol}</span>
       </div>
 
       {/* Rarity Glow for Legendaries */}

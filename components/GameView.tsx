@@ -239,6 +239,11 @@ const GameView: React.FC = () => {
 
   if (players.length === 0) return null;
 
+  // Cálculo dinâmico para evitar que as cartas se sobreponham demais ou cortem nas bordas
+  const hand = players[0]?.cards || [];
+  const handCount = hand.length;
+  const dynamicSpacing = handCount > 6 ? Math.max(-78, -48 - (handCount - 6) * 2.5) : -48;
+
   return (
     <div className={`h-screen w-full ${arena.bgColor} relative flex flex-col items-center justify-between overflow-hidden ${isShaking ? 'animate-shake' : ''}`}>
       {freezeOverlay && <div className="absolute inset-0 z-[150] bg-cyan-400/20 backdrop-blur-sm animate-pulse pointer-events-none"></div>}
@@ -299,26 +304,36 @@ const GameView: React.FC = () => {
       )}
 
       {/* HUD Inferior: Suas Cartas e Controles */}
-      <div className="w-full max-w-5xl z-20 pb-4 px-2 relative">
+      <div className="w-full max-w-full z-20 pb-4 px-2 relative">
         {selectedCardsIds.length > 0 && (
           <div className="absolute -top-16 left-1/2 -translate-x-1/2 z-50">
             <button onClick={confirmPlay} className="bg-yellow-500 px-12 py-3 rounded-2xl border-b-6 border-yellow-800 font-black clash-text italic text-xl uppercase text-black active:translate-y-1 active:border-b-2 shadow-2xl">JOGAR</button>
           </div>
         )}
         
-        {/* Hand container ajustado: altura maior (h-56) e pt-14 para não cortar cartas selecionadas */}
-        <div className="flex justify-center -space-x-12 h-56 items-end pb-4 overflow-x-auto no-scrollbar px-10 pt-14">
-          {players[0]?.cards.map((card, idx) => (
-            <div key={card.instanceId} className="animate-card-fly-in" style={{ animationDelay: `${idx * 50}ms` }}>
-              <ClashCard 
-                card={card} 
-                size="md" 
-                selected={selectedCardsIds.includes(card.instanceId)} 
-                playable={isCardPlayable(card, discardPile[discardPile.length - 1], currentColor)} 
-                onClick={() => toggleSelectCard(card)} 
-              />
-            </div>
-          ))}
+        {/* Container de mão aprimorado com rolagem suave e margens dinâmicas */}
+        <div className="flex justify-center items-end h-64 overflow-x-auto no-scrollbar px-10 pt-16 relative">
+          <div className="inline-flex items-end min-w-max">
+            {hand.map((card, idx) => (
+              <div 
+                key={card.instanceId} 
+                className="animate-card-fly-in transition-all duration-300" 
+                style={{ 
+                  animationDelay: `${idx * 40}ms`,
+                  marginLeft: idx === 0 ? 0 : `${dynamicSpacing}px`,
+                  zIndex: selectedCardsIds.includes(card.instanceId) ? 100 : idx
+                }}
+              >
+                <ClashCard 
+                  card={card} 
+                  size="md" 
+                  selected={selectedCardsIds.includes(card.instanceId)} 
+                  playable={isCardPlayable(card, discardPile[discardPile.length - 1], currentColor)} 
+                  onClick={() => toggleSelectCard(card)} 
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="bg-[#1a2b45] rounded-[30px] px-8 py-4 border-t-4 border-blue-400 flex justify-between items-center shadow-2xl mx-auto max-w-lg mt-2">

@@ -34,11 +34,11 @@ export const ALL_CARDS: CardDefinition[] = [
     description: `Tropa básica de valor ${n}. Essencial para o deck.`,
     levelEffect: "+10% XP por vitória"
   })),
-  { id: 'spell-freeze', type: CardType.SKIP, baseColor: 'Blue', label: 'Gelo', rarity: 'Épica', description: 'Congela o turno do próximo desafiante.', levelEffect: "+50 Ouro na Vitória" },
-  { id: 'spell-log', type: CardType.REVERSE, baseColor: 'Red', label: 'O Tronco', rarity: 'Lendária', description: 'Inverte o fluxo da arena.', levelEffect: "+100 Ouro na Vitória" },
-  { id: 'spell-rage', type: CardType.DRAW2, baseColor: 'Yellow', label: 'Fúria', rarity: 'Rara', description: 'Fúria Real: Próximo compra 2 cartas.', levelEffect: "+30 Ouro na Vitória" },
-  { id: 'spell-skarmy', type: CardType.DRAW4, baseColor: 'Wild', label: 'Exército', rarity: 'Épica', description: 'Emboscada de Esqueletos: Próximo compra 4.', levelEffect: "+80 Ouro na Vitória" },
-  { id: 'spell-mirror', type: CardType.WILD, baseColor: 'Wild', label: 'Espelho', rarity: 'Lendária', description: 'Reflete a cor que você desejar.', levelEffect: "+120 Ouro na Vitória" },
+  { id: 'spell-freeze', type: CardType.SKIP, baseColor: 'Blue', label: 'Congelar', rarity: 'Épica', description: 'Bloqueio Real: Congela o turno do próximo desafiante.', levelEffect: "+50 Ouro na Vitória" },
+  { id: 'spell-log', type: CardType.REVERSE, baseColor: 'Red', label: 'O Tronco', rarity: 'Lendária', description: 'Inversão Real: Inverte o fluxo da arena.', levelEffect: "+100 Ouro na Vitória" },
+  { id: 'spell-rage', type: CardType.DRAW2, baseColor: 'Yellow', label: 'Exército de Esqueletos', rarity: 'Rara', description: 'Emboscada (+2): Próximo desafiante compra 2 cartas.', levelEffect: "+30 Ouro na Vitória" },
+  { id: 'spell-skarmy', type: CardType.DRAW4, baseColor: 'Wild', label: 'Fúria', rarity: 'Épica', description: 'Fúria Real (+4): Escolha a cor e o próximo compra 4.', levelEffect: "+80 Ouro na Vitória" },
+  { id: 'spell-mirror', type: CardType.WILD, baseColor: 'Wild', label: 'Espelho', rarity: 'Lendária', description: 'Reflexo Real: Muda a cor da arena para o que você desejar.', levelEffect: "+120 Ouro na Vitória" },
 ];
 
 export const COLORS: CardColor[] = ['Red', 'Blue', 'Yellow', 'Green'];
