@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store.ts';
-import { GameStatus } from '../types.ts';
-import { ARENAS } from '../constants.tsx';
+import { GameStatus, ShopItem } from '../types.ts';
+import { ARENAS, SHOP_ITEMS } from '../constants.tsx';
 import CardCollection from './CardCollection.tsx';
 import { sounds } from '../logic/soundManager.ts';
 
@@ -21,8 +21,7 @@ const MenuView: React.FC = () => {
     currentArenaIndex, 
     startOpeningChest, 
     collectChest, 
-    buyCard, 
-    buyGoldPack,
+    buyShopItem,
     completeOnboarding,
     startRankedLobby
   } = useGameStore();
@@ -48,29 +47,14 @@ const MenuView: React.FC = () => {
     startRankedLobby();
   };
 
-  const handleBuy = (item: any) => {
-    if (item.id === 'gold-pack') {
-      if (profile.gems >= item.cost) {
-        sounds.playChestOpen();
-        buyGoldPack();
-      }
-    } else {
-      const currency = item.currency as 'gold' | 'gems';
-      if (profile[currency] >= item.cost) {
-        sounds.playClick();
-        buyCard(item.id, item.cost, currency, item.qty);
-      }
+  const handleBuyItem = (item: ShopItem) => {
+    if (profile[item.currency] >= item.cost) {
+      sounds.playChestOpen();
+      buyShopItem(item);
     }
   };
 
   const xpProgress = (profile.xp % 1000) / 10;
-
-  const shopItems = [
-    { id: 'num-0', label: 'E. de Gelo', cost: 250, currency: 'gold', icon: '❄️', qty: 5 },
-    { id: 'spell-skarmy', label: 'Exército', cost: 1200, currency: 'gold', icon: '💀', qty: 3 },
-    { id: 'gold-pack', label: '1000 Ouro', cost: 50, currency: 'gems', icon: '💰', qty: 1000 },
-    { id: 'spell-mirror', label: 'Espelho', cost: 250, currency: 'gems', icon: '🪞', qty: 2 }
-  ];
 
   const formatTime = (ms: number) => {
     const totalSecs = Math.max(0, Math.floor(ms / 1000));
@@ -142,21 +126,21 @@ const MenuView: React.FC = () => {
             <div className="flex flex-col gap-3 w-full">
                <button onClick={handleStartRanked} className="w-full py-6 bg-yellow-500 rounded-[25px] border-b-[8px] border-yellow-800 shadow-xl flex items-center px-8 gap-6 active:translate-y-1 active:border-b-[2px] transition-all group z-[110]">
                   <div className="text-4xl drop-shadow-lg group-active:scale-110 transition-transform shrink-0">⚔️</div>
-                  <div className="flex flex-col items-start"><span className="text-xl text-black font-black clash-text italic uppercase tracking-tight leading-none">MODO RANQUEADO</span><span className="text-[9px] text-black/40 font-bold uppercase tracking-widest italic">Lobby Competitivo</span></div>
+                  <div className="flex flex-col items-start"><span className="text-xl text-black font-black clash-text italic uppercase tracking-tight leading-none">MODO RANQUEADO</span><span className="text-[9px] text-black/40 font-bold uppercase tracking-widest italic">Competir agora</span></div>
                </button>
                <button onClick={() => { sounds.playClick(); setGameStatus(GameStatus.ARENA_SELECTION); }} className="w-full py-6 bg-blue-600 rounded-[25px] border-b-[8px] border-blue-900 shadow-xl flex items-center px-8 gap-6 active:translate-y-1 active:border-b-[2px] transition-all group">
                   <div className="text-4xl drop-shadow-lg group-active:scale-110 transition-transform shrink-0">🏟️</div>
-                  <div className="flex flex-col items-start text-white"><span className="text-xl font-black clash-text italic uppercase tracking-tight leading-none">TREINO EM ARENA</span><span className="text-[9px] text-white/40 font-bold uppercase tracking-widest italic">Selecione seu Campo</span></div>
+                  <div className="flex flex-col items-start text-white"><span className="text-xl font-black clash-text italic uppercase tracking-tight leading-none">TREINO EM ARENA</span><span className="text-[9px] text-white/40 font-bold uppercase tracking-widest italic">Aprimore suas táticas</span></div>
                </button>
                <button onClick={() => { sounds.playClick(); setGameStatus(GameStatus.TROPHY_ROAD); }} className="w-full py-6 bg-indigo-700 rounded-[25px] border-b-[8px] border-indigo-950 shadow-xl flex items-center px-8 gap-6 active:translate-y-1 active:border-b-[2px] transition-all group">
                   <div className="text-4xl drop-shadow-lg group-active:scale-110 transition-transform shrink-0">🗺️</div>
-                  <div className="flex flex-col items-start text-white"><span className="text-xl font-black clash-text italic uppercase tracking-tight leading-none">CAMINHO DE TROFÉU</span><span className="text-[9px] text-white/40 font-bold uppercase tracking-widest italic">Jornada da Realeza</span></div>
+                  <div className="flex flex-col items-start text-white"><span className="text-xl font-black clash-text italic uppercase tracking-tight leading-none">CAMINHO DE TROFÉUS</span><span className="text-[9px] text-white/40 font-bold uppercase tracking-widest italic">Suas recompensas reais</span></div>
                </button>
             </div>
             <div className="bg-black/40 p-5 rounded-[35px] border border-white/5 shadow-inner mt-4">
                <div className="flex justify-between items-center mb-4 px-2">
                   <span className="text-[10px] font-black text-white/30 uppercase italic tracking-widest">Espaços de Baú</span>
-                  <div className="flex gap-1 items-center"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div><span className="text-[8px] text-blue-400 font-bold uppercase">Timer Ativo</span></div>
+                  <div className="flex gap-1 items-center"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div><span className="text-[8px] text-blue-400 font-bold uppercase">Tempo Ativo</span></div>
                </div>
                <div className="grid grid-cols-4 gap-3">
                   {profile.chestSlots.map((chest, idx) => {
@@ -177,7 +161,7 @@ const MenuView: React.FC = () => {
                           <>
                             <span className={`text-2xl drop-shadow-lg ${isReady ? 'animate-bounce' : ''}`}>📦</span>
                             {!chest.isOpening ? (
-                              <span className="text-[6px] font-black text-white/60 uppercase">TOQUE PARA ABRIR</span>
+                              <span className="text-[6px] font-black text-white/60 uppercase">ABRIR</span>
                             ) : isReady ? (
                               <span className="text-[6px] font-black text-emerald-400 uppercase">ABRIR AGORA!</span>
                             ) : (
@@ -196,33 +180,64 @@ const MenuView: React.FC = () => {
         )}
 
         {activeTab === 'Loja' && (
-          <div className="p-6 flex flex-col gap-8 pb-24 max-w-lg mx-auto animate-in slide-in-from-left duration-300">
-             <h2 className="text-2xl font-black clash-text italic uppercase text-yellow-400 tracking-tighter border-b-2 border-yellow-400/20 pb-2">OFERTAS DA ARENA</h2>
-             <div className="grid grid-cols-2 gap-4">
-                {shopItems.map(item => (
-                  <div key={item.id} className="bg-blue-950/40 rounded-3xl p-5 border border-white/10 flex flex-col items-center gap-3 relative group overflow-hidden shadow-xl">
-                    <div className="absolute inset-0 bg-white/5 opacity-0 group-active:opacity-100 transition-opacity"></div>
-                    <div className="text-5xl drop-shadow-lg mb-2">{item.icon}</div>
-                    <div className="text-center">
-                       <div className="text-xs font-black clash-text italic uppercase leading-none">{item.label}</div>
-                       <div className="text-[9px] text-blue-300 font-bold uppercase mt-1">x{item.qty} Unidades</div>
-                    </div>
-                    <button 
-                      onClick={() => handleBuy(item)}
-                      disabled={profile[item.currency as 'gold' | 'gems'] < item.cost}
-                      className={`w-full py-2 rounded-xl border-b-4 font-black text-xs clash-text italic uppercase transition-all active:translate-y-1 active:border-b-0 disabled:grayscale disabled:opacity-50 ${item.currency === 'gold' ? 'bg-emerald-600 border-emerald-900' : 'bg-blue-600 border-blue-900'}`}
-                    >
-                      {item.cost} {item.currency === 'gold' ? '💰' : '💎'}
-                    </button>
-                  </div>
-                ))}
+          <div className="p-6 flex flex-col gap-10 pb-24 max-w-lg mx-auto animate-in slide-in-from-left duration-300">
+             <div>
+                <h2 className="text-lg font-black clash-text italic uppercase text-yellow-400 tracking-tighter border-b-2 border-yellow-400/20 pb-2 mb-4">OFERTAS DE OURO</h2>
+                <div className="grid grid-cols-2 gap-4">
+                   {SHOP_ITEMS.filter(i => i.currency === 'gold').map(item => {
+                     const isOwned = profile.inventory.includes(item.id);
+                     return (
+                       <div key={item.id} className="bg-blue-950/40 rounded-3xl p-5 border border-white/10 flex flex-col items-center gap-3 relative group overflow-hidden shadow-xl">
+                         <div className="absolute top-2 right-3 text-[8px] font-black text-white/30 uppercase">{item.category}</div>
+                         <div className="text-5xl drop-shadow-lg my-2">{item.icon}</div>
+                         <div className="text-center">
+                            <div className="text-[11px] font-black clash-text italic uppercase leading-tight h-8 flex items-center justify-center">{item.label}</div>
+                            <div className="text-[8px] text-blue-300 font-bold uppercase mt-1 opacity-60">{item.description}</div>
+                         </div>
+                         <button 
+                           onClick={() => handleBuyItem(item)}
+                           disabled={isOwned || profile.gold < item.cost}
+                           className={`w-full py-2.5 rounded-xl border-b-4 font-black text-xs clash-text italic uppercase transition-all active:translate-y-1 active:border-b-0 disabled:grayscale disabled:opacity-50 bg-emerald-600 border-emerald-900`}
+                         >
+                           {isOwned ? 'ADQUIRIDO' : `${item.cost} 💰`}
+                         </button>
+                       </div>
+                     );
+                   })}
+                </div>
+             </div>
+
+             <div>
+                <h2 className="text-lg font-black clash-text italic uppercase text-cyan-400 tracking-tighter border-b-2 border-cyan-400/20 pb-2 mb-4">OFERTAS DE GEMAS</h2>
+                <div className="grid grid-cols-2 gap-4">
+                   {SHOP_ITEMS.filter(i => i.currency === 'gems').map(item => {
+                     const isOwned = profile.inventory.includes(item.id) && item.type !== 'PACOTE_OURO';
+                     return (
+                       <div key={item.id} className="bg-indigo-900/30 rounded-3xl p-5 border border-white/10 flex flex-col items-center gap-3 relative group overflow-hidden shadow-xl">
+                         <div className="absolute top-2 right-3 text-[8px] font-black text-white/30 uppercase">{item.category}</div>
+                         <div className="text-5xl drop-shadow-lg my-2 animate-float">{item.icon}</div>
+                         <div className="text-center">
+                            <div className="text-[11px] font-black clash-text italic uppercase leading-tight h-8 flex items-center justify-center">{item.label}</div>
+                            <div className="text-[8px] text-blue-300 font-bold uppercase mt-1 opacity-60">{item.description}</div>
+                         </div>
+                         <button 
+                           onClick={() => handleBuyItem(item)}
+                           disabled={isOwned || profile.gems < item.cost}
+                           className={`w-full py-2.5 rounded-xl border-b-4 font-black text-xs clash-text italic uppercase transition-all active:translate-y-1 active:border-b-0 disabled:grayscale disabled:opacity-50 bg-blue-600 border-blue-900`}
+                         >
+                           {isOwned ? 'ADQUIRIDO' : `${item.cost} 💎`}
+                         </button>
+                       </div>
+                     );
+                   })}
+                </div>
              </div>
           </div>
         )}
 
         {activeTab === 'Social' && (
            <div className="p-6 flex flex-col gap-6 animate-in slide-in-from-right duration-300">
-              <h2 className="text-2xl font-black clash-text italic uppercase text-blue-400 tracking-tighter">CLÃS EM DESTAQUE</h2>
+              <h2 className="text-2xl font-black clash-text italic uppercase text-blue-400 tracking-tighter">CLÃS REAIS</h2>
               <div className="flex flex-col gap-3">
                  {clans.map(clan => (
                     <div key={clan.name} className="bg-black/40 p-4 rounded-3xl border border-white/5 flex items-center justify-between shadow-xl">
@@ -245,12 +260,12 @@ const MenuView: React.FC = () => {
 
         {activeTab === 'Eventos' && (
            <div className="p-6 flex flex-col gap-6 animate-in fade-in duration-300">
-              <h2 className="text-2xl font-black clash-text italic uppercase text-red-500 tracking-tighter">EVENTOS GLOBAIS</h2>
+              <h2 className="text-2xl font-black clash-text italic uppercase text-red-500 tracking-tighter">EVENTOS ATIVOS</h2>
               <div className="bg-gradient-to-r from-yellow-600 to-yellow-800 p-6 rounded-[35px] border-b-8 border-yellow-950 flex flex-col items-center gap-4 text-center shadow-2xl animate-float">
                  <div className="text-6xl drop-shadow-xl">💰</div>
                  <div>
                     <h3 className="text-xl font-black clash-text italic uppercase tracking-tighter text-black">DOBRO DE OURO</h3>
-                    <p className="text-black/60 text-[8px] font-bold uppercase tracking-widest mt-1">Todas as batalhas premiam 2x mais ouro!</p>
+                    <p className="text-black/60 text-[8px] font-bold uppercase tracking-widest mt-1">Todas as batalhas dão 2x mais ouro!</p>
                  </div>
                  <div className="bg-black/20 px-4 py-1 rounded-full text-[10px] font-black italic">TERMINA EM: 14h 22m</div>
               </div>

@@ -1,13 +1,13 @@
 
-export type CardColor = 'Red' | 'Blue' | 'Yellow' | 'Green' | 'Wild';
+export type CardColor = 'Vermelho' | 'Azul' | 'Amarelo' | 'Verde' | 'Especial';
 
 export enum CardType {
-  NUMBER = 'NUMBER',
-  SKIP = 'SKIP', 
-  REVERSE = 'REVERSE', 
-  DRAW2 = 'DRAW2', 
-  DRAW4 = 'DRAW4', 
-  WILD = 'WILD', 
+  NUMBER = 'NUMERO',
+  SKIP = 'PULAR', 
+  REVERSE = 'INVERTER', 
+  DRAW2 = 'COMPRAR_2', 
+  DRAW4 = 'COMPRAR_4', 
+  WILD = 'CORINGA', 
 }
 
 export type Rarity = 'Comum' | 'Rara' | 'Épica' | 'Lendária';
@@ -53,6 +53,18 @@ export interface Player {
   isBoss?: boolean;
 }
 
+export interface GameRoom {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  maxPlayers: number;
+  currentPlayers: number;
+  betAmount: number;
+  timePerTurn: number;
+  status: 'Aguardando' | 'Em Jogo';
+  arenaName: string;
+}
+
 export interface LobbyPlayer {
   id: string;
   name: string;
@@ -61,14 +73,6 @@ export interface LobbyPlayer {
   avatar: string;
   status: 'Disponível' | 'Em Partida' | 'Aguardando';
   quote?: string;
-}
-
-export interface TrophyReward {
-  id: string;
-  trophiesRequired: number;
-  type: 'GOLD' | 'GEMS' | 'CHEST' | 'CARD' | 'BOSS';
-  value: number | string;
-  label: string;
 }
 
 export interface UserProfile {
@@ -84,17 +88,19 @@ export interface UserProfile {
   chestSlots: (Chest | null)[];
   claimedRewards: string[]; 
   isFirstTime: boolean;
+  inventory: string[]; 
 }
 
 export enum GameStatus {
   MENU = 'MENU',
-  LOADING = 'LOADING',
-  LOBBY = 'LOBBY',
-  BATTLE = 'BATTLE',
-  VICTORY = 'VICTORY',
-  DEFEAT = 'DEFEAT',
-  TROPHY_ROAD = 'TROPHY_ROAD',
-  ARENA_SELECTION = 'ARENA_SELECTION'
+  LOADING = 'CARREGANDO',
+  LOBBY = 'SALA_ESPERA',
+  ROOM_WAITING = 'AGUARDANDO_JOGADORES',
+  BATTLE = 'BATALHA',
+  VICTORY = 'VITORIA',
+  DEFEAT = 'DERROTA',
+  TROPHY_ROAD = 'CAMINHO_TROFEUS',
+  ARENA_SELECTION = 'SELECAO_ARENA'
 }
 
 export type ArenaTheme = {
@@ -105,3 +111,24 @@ export type ArenaTheme = {
   banner: string;
   bossPower?: string;
 };
+
+// Fix: Added missing TrophyReward interface used in constants.tsx and store.ts
+export interface TrophyReward {
+  id: string;
+  trophiesRequired: number;
+  type: 'OURO' | 'BAU' | 'GEMAS' | 'CHEFE' | 'CARTA';
+  value: string | number;
+  label: string;
+}
+
+// Fix: Added missing ShopItem interface used in constants.tsx, store.ts, and MenuView.tsx
+export interface ShopItem {
+  id: string;
+  category: string;
+  type: string;
+  label: string;
+  description: string;
+  cost: number;
+  currency: 'gold' | 'gems';
+  icon: string;
+}

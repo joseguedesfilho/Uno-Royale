@@ -1,51 +1,56 @@
 
 import React, { useEffect, useState } from 'react';
 import { useGameStore } from '../store.ts';
-import { GameStatus, LobbyPlayer } from '../types.ts';
-import { ALL_CARDS } from '../constants.tsx';
+import { GameStatus, GameRoom } from '../types.ts';
 import { sounds } from '../logic/soundManager.ts';
-import { GoogleGenAI } from "@google/genai";
-import ClashCard from './ClashCard.tsx';
+import { GoogleGenAI, Type } from "@google/genai";
 
 const LobbyView: React.FC = () => {
   const { 
     setGameStatus, 
     profile, 
-    lobbyPlayers, 
-    setLobbyPlayers 
+    availableRooms, 
+    fetchRooms,
+    createRoom,
+    joinRoom
   } = useGameStore();
 
-  const [isLoadingQuotes, setIsLoadingQuotes] = useState(false);
-  const [invitingPlayerId, setInvitingPlayerId] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedBet, setSelectedBet] = useState(10);
+  const [selectedPlayers, setSelectedPlayers] = useState(2);
+  const [selectedTime, setSelectedTime] = useState(10);
+  const [arenaName, setArenaName] = useState('Arena Royale');
+  const [isGeneratingName, setIsGeneratingName] = useState(false);
 
   useEffect(() => {
-    // Simular entrada de jogadores globais para o modo ranqueado
-    const mockPlayers: LobbyPlayer[] = [
-      { id: 'lp-1', name: 'ReiDoUno77', level: 12, trophies: 2450, avatar: '🧙‍♂️', status: 'Disponível' },
-      { id: 'lp-2', name: 'MestreDasCartas', level: 9, trophies: 1820, avatar: '🧝‍♀️', status: 'Disponível' },
-      { id: 'lp-3', name: 'LendárioBR', level: 15, trophies: 3100, avatar: '🧛‍♂️', status: 'Em Partida' },
-      { id: 'lp-4', name: 'SombraReal', level: 10, trophies: 2100, avatar: '👤', status: 'Disponível' },
-    ];
-    setLobbyPlayers(mockPlayers);
-    fetchQuotes(mockPlayers);
-  }, []);
+    fetchRooms();
+    const interval = setInterval(fetchRooms, 10000);
+    return () => clearInterval(interval);
+  }, [fetchRooms]);
 
-  const fetchQuotes = async (players: LobbyPlayer[]) => {
-    setIsLoadingQuotes(true);
+  const generateArenaName = async () => {
+    setIsGeneratingName(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const prompt = `Gere 4 frases curtas e engraçadas de provocação (estilo Clash Royale) para os seguintes jogadores em um lobby global de cartas: ${players.map(p => p.name).join(', ')}. Responda APENAS um array JSON de strings.`;
+      const prompt = "Gere 3 nomes épicos de arenas para um jogo de cartas Royale. Retorne apenas os nomes em um array JSON: ['nome1', 'nome2', 'nome3'].";
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: { names: { type: Type.ARRAY, items: { type: Type.STRING } } },
+            required: ["names"]
+          }
+        }
       });
-      const text = response.text || "[]";
-      const quotes = JSON.parse(text.replace(/```json|```/g, ''));
-      setLobbyPlayers(players.map((p, i) => ({ ...p, quote: quotes[i] || 'Te vejo na arena!' })));
+      const names = JSON.parse(response.text).names;
+      setArenaName(names[Math.floor(Math.random() * names.length)]);
     } catch (e) {
-      console.error("Erro ao carregar frases da IA", e);
+      setArenaName('Arena do Desafio');
     } finally {
-      setIsLoadingQuotes(false);
+      setIsGeneratingName(false);
     }
   };
 
@@ -54,72 +59,184 @@ const LobbyView: React.FC = () => {
     setGameStatus(GameStatus.MENU);
   };
 
-  const handleChallenge = (player: LobbyPlayer) => {
-    if (player.status !== 'Disponível') return;
+  const handleCreateRoom = () => {
+    if (profile.gems < selectedBet) return;
     sounds.playClick();
-    setInvitingPlayerId(player.id);
-    
-    setTimeout(() => {
-      setGameStatus(GameStatus.LOADING);
-      setTimeout(() => {
-        setGameStatus(GameStatus.BATTLE);
-      }, 1200);
-    }, 1500);
+    createRoom({
+      betAmount: selectedBet,
+      maxPlayers: selectedPlayers,
+      timePerTurn: selectedTime,
+      arenaName: arenaName
+    });
   };
 
-  const activeDeckCards = ALL_CARDS.filter(c => profile.activeDeck.includes(c.id));
-
   return (
-    <div className="h-screen w-full bg-[#0b1421] flex flex-col text-white animate-in fade-in duration-500">
-      <div className="px-6 py-8 flex flex-col relative overflow-hidden shrink-0 border-b-4 border-black/60 shadow-2xl bg-gradient-to-b from-indigo-900 to-[#0b1421]">
-         <div className="relative z-10 flex items-center justify-between mb-6">
+    <div className="h-screen w-full bg-[#0b1421] flex flex-col text-white animate-in fade-in duration-500 overflow-hidden">
+      {/* Header Estilizado */}
+      <div className="px-6 py-8 bg-gradient-to-b from-indigo-900 to-[#0b1421] border-b-4 border-black/60 shadow-2xl relative">
+        <div className="flex items-center justify-between mb-2">
            <button onClick={handleBack} className="w-10 h-10 bg-black/40 rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-transform">🔙</button>
            <div className="text-center">
-             <h2 className="text-2xl font-black clash-text italic uppercase tracking-tighter text-white leading-none drop-shadow-lg">LOBBY GLOBAL</h2>
-             <div className="flex items-center justify-center gap-2 mt-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-[10px] font-black text-green-400 uppercase tracking-widest italic">MODO RANQUEADO ONLINE</span>
-             </div>
+             <h2 className="text-2xl font-black clash-text italic uppercase tracking-tighter text-white leading-none drop-shadow-lg">SALÃO DE CONTRATOS</h2>
+             <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest italic mt-1 block">ESCOLHA SUA MESA</span>
            </div>
            <div className="w-10"></div>
-         </div>
-
-         <div className="relative z-10 bg-black/40 backdrop-blur-md rounded-[30px] p-4 border border-white/5 shadow-inner">
-            <div className="flex justify-between items-center mb-3 px-2">
-               <span className="text-[9px] font-black text-blue-300 uppercase italic tracking-widest">SEU DECK ATIVO</span>
-               <span className="text-yellow-400 font-black italic text-xs">{profile.trophies} 🏆</span>
-            </div>
-            <div className="flex justify-center -space-x-4">
-               {activeDeckCards.map((card) => (
-                 <div key={card.id} className="scale-50 -mx-6">
-                    <ClashCard card={{...card, instanceId: '', color: card.baseColor}} size="sm" />
-                 </div>
-               ))}
-            </div>
-         </div>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 bg-[#0b1421]">
-        <h3 className="text-[11px] font-black text-white/30 uppercase italic tracking-[0.3em] mb-2">Desafiantes do Ranking</h3>
-        
-        {lobbyPlayers.map((lp) => (
-          <div key={lp.id} className={`relative bg-black/40 rounded-[35px] border-2 p-5 flex items-center justify-between transition-all shadow-xl ${invitingPlayerId === lp.id ? 'border-yellow-400 scale-105 animate-pulse' : 'border-white/5'} ${lp.status === 'Em Partida' ? 'opacity-50 grayscale' : ''}`}>
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-blue-900 rounded-2xl flex items-center justify-center text-3xl border-2 border-white/10 shadow-lg">{lp.avatar}</div>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                   <span className="font-black clash-text italic uppercase text-sm tracking-tight">{lp.name}</span>
-                   <span className="text-yellow-400 text-xs font-black italic">{lp.trophies} 🏆</span>
-                </div>
-                {lp.quote && <span className="text-[10px] text-blue-300 font-bold italic opacity-80 mt-1">"{lp.quote}"</span>}
+      {/* Lista de Mesas */}
+      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
+        <div className="flex justify-between items-center mb-2 px-2">
+           <span className="text-[9px] font-black text-white/30 uppercase italic tracking-widest">Mesas Disponíveis</span>
+           <div className="flex items-center gap-3">
+              <div className="bg-black/60 rounded-full px-3 py-1 flex items-center gap-2 border border-white/10">
+                <span className="text-emerald-400 font-black text-xs">{profile.gems}</span>
+                <span className="text-xs">💎</span>
               </div>
-            </div>
-            <button onClick={() => handleChallenge(lp)} disabled={lp.status !== 'Disponível' || !!invitingPlayerId} className={`px-6 py-3 rounded-2xl border-b-4 font-black clash-text italic text-xs uppercase transition-all active:translate-y-1 active:border-b-0 ${invitingPlayerId === lp.id ? 'bg-yellow-400 border-yellow-700 text-black' : 'bg-blue-600 border-blue-950 text-white'} disabled:grayscale disabled:opacity-40`}>
-              {invitingPlayerId === lp.id ? 'CONVIDANDO...' : 'DESAFIAR'}
-            </button>
+           </div>
+        </div>
+
+        {availableRooms.map((room) => (
+          <div key={room.id} className="relative bg-black/40 rounded-[35px] border-2 border-white/5 p-6 flex flex-col gap-4 shadow-xl group hover:border-blue-500/50 transition-all">
+             <div className="flex justify-between items-start">
+                <div>
+                   <h3 className="text-lg font-black clash-text italic uppercase text-white tracking-tight">{room.arenaName}</h3>
+                   <span className="text-[10px] font-bold text-blue-300/60 uppercase">Dono: {room.creatorName}</span>
+                </div>
+                <div className="bg-emerald-600/20 border border-emerald-500/30 px-4 py-2 rounded-2xl flex items-center gap-2">
+                   <span className="text-emerald-400 font-black text-sm">{room.betAmount}</span>
+                   <span className="text-sm">💎</span>
+                </div>
+             </div>
+
+             <div className="flex gap-4">
+                <div className="flex-1 bg-black/40 rounded-2xl p-3 flex flex-col items-center">
+                   <span className="text-[8px] font-black text-white/30 uppercase mb-1">JOGADORES</span>
+                   <span className="text-xs font-black italic">{room.currentPlayers}/{room.maxPlayers}</span>
+                </div>
+                <div className="flex-1 bg-black/40 rounded-2xl p-3 flex flex-col items-center">
+                   <span className="text-[8px] font-black text-white/30 uppercase mb-1">TEMPO</span>
+                   <span className="text-xs font-black italic">{room.timePerTurn}s</span>
+                </div>
+                <div className="flex-1 bg-black/40 rounded-2xl p-3 flex flex-col items-center">
+                   <span className="text-[8px] font-black text-white/30 uppercase mb-1">POTE</span>
+                   <span className="text-xs font-black text-yellow-400 italic">{(room.betAmount * room.maxPlayers)} 💎</span>
+                </div>
+             </div>
+
+             <button 
+               onClick={() => joinRoom(room)}
+               disabled={profile.gems < room.betAmount}
+               className="w-full py-4 bg-blue-600 border-b-6 border-blue-900 rounded-2xl font-black clash-text italic text-sm uppercase active:translate-y-1 active:border-b-0 disabled:grayscale disabled:opacity-40"
+             >
+               ASSINAR CONTRATO
+             </button>
           </div>
         ))}
       </div>
+
+      {/* Botão de Criar no Rodapé */}
+      <div className="p-6 bg-[#0b1421] border-t-4 border-black/80">
+        <button 
+          onClick={() => { sounds.playClick(); setShowCreateModal(true); generateArenaName(); }}
+          className="w-full py-5 bg-yellow-500 border-b-8 border-yellow-800 rounded-3xl font-black clash-text italic text-xl uppercase text-black active:translate-y-2 active:border-b-0 shadow-2xl flex items-center justify-center gap-4"
+        >
+          <span>CRIAR NOVA MESA</span>
+          <span className="text-2xl">📜</span>
+        </button>
+      </div>
+
+      {/* Modal de Criação (Pergaminho de Contrato) */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-[500] bg-black/90 flex items-center justify-center p-6 animate-in fade-in duration-300">
+           <div className="bg-[#f4e4bc] w-full max-w-sm rounded-[50px] border-8 border-[#8b4513] p-8 flex flex-col text-[#3d2b1f] shadow-[0_0_50px_rgba(0,0,0,0.8)] relative">
+              <button onClick={() => setShowCreateModal(false)} className="absolute top-4 right-6 text-2xl font-black">✕</button>
+              
+              <div className="text-center mb-6">
+                 <h2 className="text-3xl font-black clash-text italic uppercase tracking-tighter border-b-2 border-[#8b4513]/20 pb-2">Novo Contrato</h2>
+                 <p className="text-[10px] font-bold uppercase mt-2 tracking-widest opacity-60 italic">Termos de Batalha Real</p>
+              </div>
+
+              <div className="flex flex-col gap-6">
+                 {/* Nome da Arena */}
+                 <div className="flex flex-col gap-2">
+                    <label className="text-[9px] font-black uppercase tracking-widest ml-2">Nome da Arena</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={arenaName} 
+                        onChange={(e) => setArenaName(e.target.value)}
+                        className="flex-1 bg-black/10 border-2 border-[#8b4513]/20 rounded-xl p-3 font-black italic text-sm outline-none" 
+                      />
+                      <button onClick={generateArenaName} disabled={isGeneratingName} className="bg-[#8b4513] text-white w-12 rounded-xl flex items-center justify-center">🔄</button>
+                    </div>
+                 </div>
+
+                 {/* Seleção de Jogadores */}
+                 <div className="flex flex-col gap-2">
+                    <label className="text-[9px] font-black uppercase tracking-widest ml-2">Desafiantes</label>
+                    <div className="flex gap-2">
+                       {[2, 3, 4].map(n => (
+                         <button 
+                           key={n} 
+                           onClick={() => setSelectedPlayers(n)}
+                           className={`flex-1 py-3 rounded-xl border-2 font-black italic text-sm transition-all ${selectedPlayers === n ? 'bg-[#8b4513] text-white border-[#8b4513]' : 'border-[#8b4513]/20'}`}
+                         >
+                           {n} P
+                         </button>
+                       ))}
+                    </div>
+                 </div>
+
+                 {/* Seleção de Tempo */}
+                 <div className="flex flex-col gap-2">
+                    <label className="text-[9px] font-black uppercase tracking-widest ml-2">Tempo por Turno</label>
+                    <div className="flex gap-2">
+                       {[5, 10, 20].map(s => (
+                         <button 
+                           key={s} 
+                           onClick={() => setSelectedTime(s)}
+                           className={`flex-1 py-3 rounded-xl border-2 font-black italic text-sm transition-all ${selectedTime === s ? 'bg-[#8b4513] text-white border-[#8b4513]' : 'border-[#8b4513]/20'}`}
+                         >
+                           {s}s
+                         </button>
+                       ))}
+                    </div>
+                 </div>
+
+                 {/* Seleção de Aposta */}
+                 <div className="flex flex-col gap-2">
+                    <label className="text-[9px] font-black uppercase tracking-widest ml-2">Aposta de Gemas</label>
+                    <div className="grid grid-cols-2 gap-2">
+                       {[10, 50, 100, 500].map(gem => (
+                         <button 
+                           key={gem} 
+                           onClick={() => setSelectedBet(gem)}
+                           disabled={profile.gems < gem}
+                           className={`py-3 rounded-xl border-2 font-black italic text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-20 ${selectedBet === gem ? 'bg-emerald-700 text-white border-emerald-900' : 'border-[#8b4513]/20'}`}
+                         >
+                           {gem} 💎
+                         </button>
+                       ))}
+                    </div>
+                 </div>
+              </div>
+
+              <div className="mt-10 flex flex-col items-center">
+                 <div className="mb-4 text-center">
+                    <span className="text-[9px] font-black uppercase opacity-60 italic">PRÊMIO TOTAL DO VENCEDOR:</span>
+                    <div className="text-2xl font-black italic text-emerald-800">{(selectedBet * selectedPlayers)} 💎</div>
+                 </div>
+                 <button 
+                    onClick={handleCreateRoom}
+                    className="w-full py-5 bg-[#8b4513] rounded-2xl border-b-8 border-[#3d2b1f] font-black clash-text italic text-xl uppercase text-white active:translate-y-2 active:border-b-0 shadow-xl"
+                 >
+                    LACRAR CONTRATO
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 };

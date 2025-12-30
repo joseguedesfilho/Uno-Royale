@@ -51,7 +51,8 @@ const TrophyRoadView: React.FC = () => {
           const isUnlocked = profile.trophies >= reward.trophiesRequired;
           const isClaimed = profile.claimedRewards.includes(reward.id);
           const isNextChallenge = nextReward?.id === reward.id;
-          const isBoss = reward.type === 'BOSS';
+          // FIX: Changed comparison from 'BOSS' to 'CHEFE' to align with TrophyReward['type']
+          const isBoss = reward.type === 'CHEFE';
 
           // Pode batalhar se for o próximo desafio OU se já estiver desbloqueado e não coletado
           const canInteract = isNextChallenge || (isUnlocked && !isClaimed);
@@ -74,7 +75,8 @@ const TrophyRoadView: React.FC = () => {
                 
                 {/* Ícone Gigante */}
                 <div className={`text-6xl drop-shadow-2xl transition-transform ${canInteract && !isClaimed ? 'animate-bounce' : ''}`}>
-                  {reward.type === 'GOLD' ? '💰' : reward.type === 'GEMS' ? '💎' : reward.type === 'CHEST' ? '📦' : reward.type === 'BOSS' ? '👹' : '🃏'}
+                  {/* FIX: Corrected type string literals from English (GOLD, GEMS, CHEST, BOSS) to defined types (OURO, GEMAS, BAU, CHEFE) */}
+                  {reward.type === 'OURO' ? '💰' : reward.type === 'GEMAS' ? '💎' : reward.type === 'BAU' ? '📦' : reward.type === 'CHEFE' ? '👹' : '🃏'}
                 </div>
 
                 <div className="text-center">

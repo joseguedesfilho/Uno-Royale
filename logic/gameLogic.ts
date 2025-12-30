@@ -4,7 +4,7 @@ import { COLORS, ALL_CARDS } from '../constants';
 
 export const createDeck = (playerDeckIds?: string[]): Card[] => {
   const deck: Card[] = [];
-  const colors: CardColor[] = ['Red', 'Blue', 'Yellow', 'Green'];
+  const colors: CardColor[] = ['Vermelho', 'Azul', 'Amarelo', 'Verde'];
   
   colors.forEach(color => {
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(num => {
@@ -40,7 +40,7 @@ export const createDeck = (playerDeckIds?: string[]): Card[] => {
       deck.push({
         ...cardDef,
         instanceId: `wild-${type}-${i}-${Math.random()}`,
-        color: 'Wild',
+        color: 'Especial',
       });
     }
   });
@@ -49,7 +49,7 @@ export const createDeck = (playerDeckIds?: string[]): Card[] => {
 };
 
 export const isCardPlayable = (card: Card, topCard: Card, currentColor: CardColor): boolean => {
-  if (card.color === 'Wild') return true;
+  if (card.color === 'Especial') return true;
   if (card.color === currentColor) return true;
   if (card.type === topCard.type && card.type !== CardType.NUMBER) return true;
   if (card.type === CardType.NUMBER && topCard.type === CardType.NUMBER && card.value === topCard.value) return true;
@@ -57,7 +57,7 @@ export const isCardPlayable = (card: Card, topCard: Card, currentColor: CardColo
 };
 
 export const isExactMatch = (card: Card, topCard: Card, currentColor: CardColor): boolean => {
-  if (card.color === 'Wild') return false;
+  if (card.color === 'Especial') return false;
   const isSameValue = card.type === CardType.NUMBER 
     ? (topCard.type === CardType.NUMBER && card.value === topCard.value)
     : (card.type === topCard.type);
@@ -91,7 +91,7 @@ export const getBotMove = (hand: Card[], topCard: Card, currentColor: CardColor,
   if (botDifficulty > 3) {
     // Guarda o +4 e o Wild se tiver outras opções, a menos que esteja com poucas cartas
     if (hand.length > 3) {
-      const normalOptions = playable.filter(c => c.color !== 'Wild');
+      const normalOptions = playable.filter(c => c.color !== 'Especial');
       if (normalOptions.length > 0) {
         // Tenta jogar ações primeiro para atrapalhar
         const actions = normalOptions.filter(c => c.type !== CardType.NUMBER);

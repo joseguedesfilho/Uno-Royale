@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGameStore } from './store.ts';
 import { GameStatus } from './types.ts';
 import MenuView from './components/MenuView.tsx';
@@ -8,31 +8,42 @@ import TrophyRoadView from './components/TrophyRoadView.tsx';
 import ArenaSelectionView from './components/ArenaSelectionView.tsx';
 import ResultOverlay from './components/ResultOverlay.tsx';
 import LobbyView from './components/LobbyView.tsx';
+import AuthView from './components/AuthView.tsx';
+import RoomWaitingView from './components/RoomWaitingView.tsx';
 
 const App: React.FC = () => {
-  const { gameStatus } = useGameStore();
-  const [hasStarted, setHasStarted] = useState(false);
+  const { gameStatus, profile, session, initialize, signOut } = useGameStore();
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  const handleStart = () => {
-    setHasStarted(true);
-  };
+  useEffect(() => {
+    const initApp = async () => {
+      try {
+        await initialize();
+      } catch (err) {
+        console.error("Erro fatal durante a inicialização:", err);
+      } finally {
+        setTimeout(() => setIsInitializing(false), 500);
+      }
+    };
+    
+    initApp();
+  }, [initialize]);
 
-  if (!hasStarted) {
+  if (isInitializing) {
     return (
-      <div className="w-full h-screen bg-[#1a2b45] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-full max-w-sm flex flex-col items-center gap-10">
-          <div className="text-9xl animate-bounce">👑</div>
-          <h1 className="text-5xl font-black text-white italic clash-text uppercase tracking-tighter">UNO ROYALE</h1>
-          <p className="text-blue-300 font-bold uppercase tracking-widest text-[10px] opacity-70">Toque no botão abaixo para entrar</p>
-          <button 
-            onClick={handleStart}
-            className="bg-yellow-500 hover:bg-yellow-400 px-16 py-6 rounded-2xl border-b-8 border-yellow-800 text-black font-black text-2xl italic clash-text uppercase tracking-wider transition-all active:translate-y-2 active:border-b-0"
-          >
-            INICIAR
-          </button>
+      <div className="w-full h-screen bg-[#0b1421] flex flex-col items-center justify-center p-6 text-center">
+        <div className="relative mb-12">
+           <div className="w-20 h-20 border-8 border-blue-900 border-t-blue-400 rounded-full animate-spin"></div>
+           <div className="absolute inset-0 flex items-center justify-center text-2xl">👑</div>
         </div>
+        <div className="text-white font-black clash-text italic uppercase tracking-tighter text-2xl mb-2 drop-shadow-lg">Uno Royale</div>
+        <div className="text-blue-300 font-bold uppercase tracking-widest text-[10px] opacity-60 animate-pulse">Entrando na Arena...</div>
       </div>
     );
+  }
+
+  if (!session || !profile) {
+    return <AuthView />;
   }
 
   return (
@@ -41,6 +52,7 @@ const App: React.FC = () => {
       {gameStatus === GameStatus.TROPHY_ROAD && <TrophyRoadView />}
       {gameStatus === GameStatus.ARENA_SELECTION && <ArenaSelectionView />}
       {gameStatus === GameStatus.LOBBY && <LobbyView />}
+      {gameStatus === GameStatus.ROOM_WAITING && <RoomWaitingView />}
       {(gameStatus === GameStatus.BATTLE || gameStatus === GameStatus.VICTORY || gameStatus === GameStatus.DEFEAT) && (
         <>
           <GameView />
@@ -49,9 +61,9 @@ const App: React.FC = () => {
       )}
       
       {gameStatus === GameStatus.LOADING && (
-        <div className="h-full w-full bg-[#0a1422] flex flex-col items-center justify-center text-white">
+        <div className="h-full w-full bg-[#0a1422] flex flex-col items-center justify-center text-white p-6">
            <div className="w-16 h-16 border-4 border-blue-400 border-t-white rounded-full animate-spin mb-6"></div>
-           <div className="text-xl font-black clash-text italic uppercase opacity-80">PREPARANDO Batalha...</div>
+           <div className="text-xl font-black clash-text italic uppercase tracking-tighter opacity-80">Preparando Batalha...</div>
         </div>
       )}
     </div>
