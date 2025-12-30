@@ -13,16 +13,22 @@ import RoomWaitingView from './components/RoomWaitingView.tsx';
 import LeaderboardView from './components/LeaderboardView.tsx';
 
 const App: React.FC = () => {
-  const { gameStatus, profile, session, initialize, signOut } = useGameStore();
+  const { gameStatus, profile, session, initialize } = useGameStore();
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     const initApp = async () => {
+      // Timeout de segurança de 5 segundos para não travar na tela azul
+      const safetyTimeout = setTimeout(() => {
+        setIsInitializing(false);
+      }, 5000);
+
       try {
         await initialize();
       } catch (err) {
         console.error("Erro fatal durante a inicialização:", err);
       } finally {
+        clearTimeout(safetyTimeout);
         setTimeout(() => setIsInitializing(false), 800);
       }
     };
@@ -30,7 +36,7 @@ const App: React.FC = () => {
     initApp();
   }, [initialize]);
 
-  if (isInitializing || (session && !profile)) {
+  if (isInitializing) {
     return (
       <div className="w-full h-screen bg-[#0b1421] flex flex-col items-center justify-center p-6 text-center">
         <div className="relative mb-12">
@@ -43,8 +49,20 @@ const App: React.FC = () => {
     );
   }
 
+  // Se após a inicialização não temos sessão, mostramos Auth
   if (!session) {
     return <AuthView />;
+  }
+
+  // Se temos sessão mas o perfil falhou em carregar, podemos estar em um estado inconsistente
+  // mas o store.ts já deve ter lidado com isso via guest fallback.
+  if (!profile && session.user.id !== 'guest') {
+     return (
+       <div className="w-full h-screen bg-[#0b1421] flex flex-col items-center justify-center p-6 text-center text-white">
+          <p className="text-sm opacity-50 mb-4 uppercase font-black">Sincronizando Perfil Real...</p>
+          <div className="w-10 h-10 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+       </div>
+     );
   }
 
   return (

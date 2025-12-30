@@ -94,19 +94,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
   socialFeed: [],
 
   initialize: async () => {
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
-        set({ session, isGuest: false });
-        if (!get().profile) await get().fetchProfile(session.user.id);
-      } else if (!get().isGuest) {
-        set({ session: null, profile: null });
-      }
-    });
+    try {
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session) {
+          set({ session, isGuest: false });
+          if (!get().profile) await get().fetchProfile(session.user.id);
+        } else if (!get().isGuest) {
+          set({ session: null, profile: null });
+        }
+      });
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      set({ session, isGuest: false });
-      await get().fetchProfile(session.user.id);
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      
+      if (data?.session) {
+        set({ session: data.session, isGuest: false });
+        await get().fetchProfile(data.session.user.id);
+      }
+    } catch (e) {
+      console.warn("Supabase init failed, proceeding as guest allowed", e);
     }
   },
 
@@ -150,7 +156,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
         claimedPassPremium: []
       };
       set({ profile: formattedProfile, currentArenaIndex: formattedProfile.currentArena });
-    } catch (e: any) { console.error(e); }
+    } catch (e: any) { 
+      console.error("Profile fetch failed:", e);
+      // Fallback para evitar tela travada
+      if (!get().profile) {
+        get().enterAsGuest("Guerreiro");
+      }
+    }
   },
 
   syncProfile: async (updates) => {
