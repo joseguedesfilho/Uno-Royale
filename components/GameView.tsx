@@ -255,12 +255,15 @@ const GameView: React.FC = () => {
   const getCardPosition = (index: number, total: number, isSelected: boolean) => {
     const mid = (total - 1) / 2;
     const diff = index - mid;
-    if (isSelected) return { transform: 'translateY(-180px) scale(1.15) rotate(0deg)', zIndex: 1000 };
-    const baseSpread = isLandscape ? 45 : 35;
+    if (isSelected) {
+      const lift = isLandscape ? 180 : 140;
+      return { transform: `translateY(-${lift}px) scale(1.12) rotate(0deg)`, zIndex: 1000 };
+    }
+    const baseSpread = isLandscape ? 40 : 28;
     const squeezingFactor = total > 7 ? (8 / total) : 1;
     const dynamicSpread = baseSpread * squeezingFactor;
-    const rotation = diff * (isLandscape ? 22 : 15) / (mid || 1);
-    const translateY = Math.pow(Math.abs(diff), 2) * (isLandscape ? 2.0 : 1.6);
+    const rotation = diff * (isLandscape ? 20 : 12) / (mid || 1);
+    const translateY = Math.pow(Math.abs(diff), 2) * (isLandscape ? 1.8 : 1.2);
     const translateX = diff * dynamicSpread;
     return {
       transform: `translateX(${translateX}px) translateY(${translateY}px) rotate(${rotation}deg)`,
@@ -271,15 +274,15 @@ const GameView: React.FC = () => {
   const topDiscardCard = discardPile[discardPile.length - 1];
 
   return (
-    <div className={`h-screen w-full ${arena.bgColor} relative flex flex-col items-center justify-between overflow-hidden select-none`}>
+    <div className={`h-screen w-full ${arena.bgColor} relative flex flex-col items-center justify-between overflow-hidden select-none`} style={{ paddingBottom: 'env(safe-area-inset-bottom)', paddingTop: 'env(safe-area-inset-top)' }}>
       {freezeOverlay && <div className="absolute inset-0 z-[200] bg-cyan-400/10 backdrop-blur-[2px] pointer-events-none transition-all duration-700"></div>}
 
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[500]">
         {kingCommentary && (
           <div key={kingCommentary.id} className="animate-king-whisper text-center px-4">
-             <span className="text-5xl sm:text-7xl font-black clash-text italic uppercase text-white drop-shadow-[0_0_20px_rgba(0,0,0,1)] tracking-tighter">
-                {String(kingCommentary.text)}
-             </span>
+            <span className="text-4xl sm:text-6xl md:text-7xl font-black clash-text italic uppercase text-white drop-shadow-[0_0_20px_rgba(0,0,0,1)] tracking-tighter">
+              {String(kingCommentary.text)}
+            </span>
           </div>
         )}
       </div>
@@ -321,22 +324,22 @@ const GameView: React.FC = () => {
       )}
 
       <div className="flex-1 w-full flex items-center justify-center relative z-10 scale-90 sm:scale-100 landscape:scale-75">
-         <div className="flex items-center gap-12 sm:gap-24">
-            <div onClick={() => turn === 0 && !isProcessing && handleDrawCard(0, 1) && nextTurn()} className={`relative group ${turn === 0 ? 'cursor-pointer hover:scale-105 active:scale-95' : 'opacity-40 pointer-events-none'} transition-all`}>
-               <ClashCard card={{} as any} hidden size="md" />
-               {turn === 0 && <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-blue-600 px-4 py-1 rounded-full text-[10px] font-black animate-bounce text-white shadow-lg">COMPRAR</div>}
+        <div className="flex items-center gap-12 sm:gap-24">
+          <div onClick={() => turn === 0 && !isProcessing && handleDrawCard(0, 1) && nextTurn()} className={`relative group ${turn === 0 ? 'cursor-pointer hover:scale-105 active:scale-95' : 'opacity-40 pointer-events-none'} transition-all`}>
+            <ClashCard card={{} as any} hidden size="md" />
+            {turn === 0 && <div className="absolute -bottom-8 sm:-bottom-10 left-1/2 -translate-x-1/2 bg-blue-600 px-4 py-1 rounded-full text-[10px] font-black animate-bounce text-white shadow-lg">COMPRAR</div>}
+          </div>
+          
+          <div className={`relative ${currentColor === 'Vermelho' ? 'glow-red' : currentColor === 'Azul' ? 'glow-blue' : currentColor === 'Amarelo' ? 'glow-yellow' : 'glow-green'} rounded-[40px] p-2 transition-all duration-700`}>
+            {topDiscardCard && <div className="drop-shadow-[0_20px_50px_rgba(0,0,0,0.9)]"><ClashCard card={topDiscardCard} size="lg" /></div>}
+            <div className={`absolute -bottom-8 sm:-bottom-10 left-1/2 -translate-x-1/2 px-8 py-1.5 rounded-full border-2 border-white/30 shadow-2xl z-20 transition-colors duration-500 ${currentColor === 'Vermelho' ? 'bg-red-600' : currentColor === 'Azul' ? 'bg-blue-600' : currentColor === 'Amarelo' ? 'bg-yellow-500' : 'bg-green-600'}`}>
+              <span className="text-[10px] font-black italic uppercase text-white tracking-widest">{currentColor}</span>
             </div>
-            
-            <div className={`relative ${currentColor === 'Vermelho' ? 'glow-red' : currentColor === 'Azul' ? 'glow-blue' : currentColor === 'Amarelo' ? 'glow-yellow' : 'glow-green'} rounded-[40px] p-2 transition-all duration-700`}>
-              {topDiscardCard && <div className="drop-shadow-[0_20px_50px_rgba(0,0,0,0.9)]"><ClashCard card={topDiscardCard} size="lg" /></div>}
-              <div className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-8 py-1.5 rounded-full border-2 border-white/30 shadow-2xl z-20 transition-colors duration-500 ${currentColor === 'Vermelho' ? 'bg-red-600' : currentColor === 'Azul' ? 'bg-blue-600' : currentColor === 'Amarelo' ? 'bg-yellow-500' : 'bg-green-600'}`}>
-                <span className="text-[10px] font-black italic uppercase text-white tracking-widest">{currentColor}</span>
-              </div>
-            </div>
-         </div>
+          </div>
+        </div>
       </div>
 
-      <div className="w-full h-[35vh] sm:h-[40vh] relative flex flex-col items-center justify-end overflow-visible z-[400] pb-6">
+      <div className="w-full h-[35vh] sm:h-[40vh] relative flex flex-col items-center justify-end overflow-visible z-[400] pb-[calc(env(safe-area-inset-bottom)+1rem)]">
         {players[0]?.emote && (
           <div className="absolute top-[-40px] bg-white rounded-2xl px-6 py-2 text-3xl shadow-2xl animate-bounce z-[700]">
              {players[0].emote}
@@ -359,14 +362,14 @@ const GameView: React.FC = () => {
                   else executePlay(0, selected);
                 }
               }} 
-              className="pointer-events-auto bg-yellow-400 px-20 py-4 rounded-[50px] border-b-[6px] border-yellow-800 font-black clash-text italic text-2xl uppercase text-black active:translate-y-1 active:border-b-0 shadow-2xl animate-in zoom-in duration-300 w-full max-w-sm"
+              className="pointer-events-auto bg-yellow-400 px-16 sm:px-20 py-3 sm:py-4 rounded-[50px] border-b-[6px] border-yellow-800 font-black clash-text italic text-xl sm:text-2xl uppercase text-black active:translate-y-1 active:border-b-0 shadow-2xl animate-in zoom-in duration-300 w-full max-w-sm"
             >
               JOGAR!
             </button>
           </div>
         )}
 
-        <div className="relative w-full h-[180px] flex items-center justify-center overflow-visible mb-16">
+        <div className="relative w-full h-[140px] sm:h-[180px] flex items-center justify-center overflow-visible mb-12 sm:mb-16">
            {players[0]?.cards.map((card, i) => {
               const isSelected = selectedCardsIds.includes(card.instanceId);
               const isPlayable = isCardPlayable(card, topDiscardCard, currentColor);
@@ -399,7 +402,7 @@ const GameView: React.FC = () => {
                   triggerKingCommentary("Grito de Guerra!");
                 }
              }} 
-             className={`ml-4 px-12 py-5 rounded-[35px] font-black clash-text italic text-xl transition-all shadow-2xl transform active:scale-95 ${unoDeclared ? 'bg-green-500 border-b-[8px] border-green-900 scale-105' : 'bg-red-600 border-b-[8px] border-red-900'}`}
+             className={`ml-4 px-8 sm:px-12 py-4 sm:py-5 rounded-[35px] font-black clash-text italic text-lg sm:text-xl transition-all shadow-2xl transform active:scale-95 ${unoDeclared ? 'bg-green-500 border-b-[8px] border-green-900 scale-105' : 'bg-red-600 border-b-[8px] border-red-900'}`}
            >
              UNO!
            </button>
