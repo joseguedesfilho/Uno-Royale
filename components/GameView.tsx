@@ -75,6 +75,7 @@ const GameView: React.FC = () => {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
+  const [handScale, setHandScale] = useState(1);
   
   const [selectedCardsIds, setSelectedCardsIds] = useState<string[]>([]);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -89,9 +90,20 @@ const GameView: React.FC = () => {
   const commentaryTimeoutRef = useRef<any>(null);
 
   useEffect(() => {
-    const handleResize = () => setIsLandscape(window.innerWidth > window.innerHeight);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const applyScale = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      setIsLandscape(w > h);
+      let s = 1;
+      if (w <= 340) s = 0.82;
+      else if (w <= 380) s = 0.88;
+      else if (w <= 420) s = 0.94;
+      else s = 1;
+      setHandScale(s);
+    };
+    applyScale();
+    window.addEventListener('resize', applyScale);
+    return () => window.removeEventListener('resize', applyScale);
   }, []);
 
   // Sync Timer with server update
@@ -274,7 +286,7 @@ const GameView: React.FC = () => {
   const topDiscardCard = discardPile[discardPile.length - 1];
 
   return (
-    <div className={`h-screen w-full ${arena.bgColor} relative flex flex-col items-center justify-between overflow-hidden select-none`} style={{ paddingBottom: 'env(safe-area-inset-bottom)', paddingTop: 'env(safe-area-inset-top)' }}>
+    <div className={`h-[100svh] w-full ${arena.bgColor} relative flex flex-col items-center justify-between overflow-hidden select-none`} style={{ paddingBottom: 'env(safe-area-inset-bottom)', paddingTop: 'env(safe-area-inset-top)' }}>
       {freezeOverlay && <div className="absolute inset-0 z-[200] bg-cyan-400/10 backdrop-blur-[2px] pointer-events-none transition-all duration-700"></div>}
 
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[500]">
@@ -331,7 +343,7 @@ const GameView: React.FC = () => {
           </div>
           
           <div className={`relative ${currentColor === 'Vermelho' ? 'glow-red' : currentColor === 'Azul' ? 'glow-blue' : currentColor === 'Amarelo' ? 'glow-yellow' : 'glow-green'} rounded-[40px] p-2 transition-all duration-700`}>
-            {topDiscardCard && <div className="drop-shadow-[0_20px_50px_rgba(0,0,0,0.9)]"><ClashCard card={topDiscardCard} size="lg" /></div>}
+            {topDiscardCard && <div className="drop-shadow-[0_20px_50px_rgba(0,0,0,0.9)]"><ClashCard card={topDiscardCard} size={isLandscape ? "lg" : "md"} /></div>}
             <div className={`absolute -bottom-8 sm:-bottom-10 left-1/2 -translate-x-1/2 px-8 py-1.5 rounded-full border-2 border-white/30 shadow-2xl z-20 transition-colors duration-500 ${currentColor === 'Vermelho' ? 'bg-red-600' : currentColor === 'Azul' ? 'bg-blue-600' : currentColor === 'Amarelo' ? 'bg-yellow-500' : 'bg-green-600'}`}>
               <span className="text-[10px] font-black italic uppercase text-white tracking-widest">{currentColor}</span>
             </div>
@@ -369,7 +381,7 @@ const GameView: React.FC = () => {
           </div>
         )}
 
-        <div className="relative w-full h-[140px] sm:h-[180px] flex items-center justify-center overflow-visible mb-12 sm:mb-16">
+        <div className="relative w-full h-[140px] sm:h-[180px] flex items-center justify-center overflow-visible mb-12 sm:mb-16" style={{ transform: `scale(${handScale})` }}>
            {players[0]?.cards.map((card, i) => {
               const isSelected = selectedCardsIds.includes(card.instanceId);
               const isPlayable = isCardPlayable(card, topDiscardCard, currentColor);
