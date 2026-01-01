@@ -28,21 +28,51 @@ const GameView: React.FC = () => {
     updateTrophies, 
     setLastRewards, 
     profile, 
+    session,
     isBossBattle, 
     isRanked,
     activeRoom,
-    selectedOpponent
+    activeGame,
+    playCard,
+    drawCard,
+    selectedOpponent,
+    quitGame
   } = useGameStore();
   
   const arena = ARENAS[currentArenaIndex];
   const turnTimeLimit = activeRoom?.timePerTurn || 10;
   
-  const [deck, setDeck] = useState<Card[]>([]);
-  const [discardPile, setDiscardPile] = useState<Card[]>([]);
-  const [players, setPlayers] = useState<(Player & { emote?: string, emoteTime?: number })[]>([]);
-  const [turn, setTurn] = useState(0);
-  const [direction, setDirection] = useState(1); 
-  const [currentColor, setCurrentColor] = useState<CardColor>('Vermelho');
+  const [emotes, setEmotes] = useState<Record<string, {text: string, time: number}>>({});
+
+  const players = React.useMemo(() => {
+     if (!activeGame || !session) return [];
+     const allPlayers = activeGame.players.map(p => ({
+         ...p,
+         cards: activeGame.hands[p.id] || [],
+         emote: emotes[p.id]?.text,
+         emoteTime: emotes[p.id]?.time
+     }));
+     
+     const myIndex = allPlayers.findIndex(p => p.id === session.user.id);
+     if (myIndex === -1) return allPlayers;
+     
+     return [
+         ...allPlayers.slice(myIndex),
+         ...allPlayers.slice(0, myIndex)
+     ];
+  }, [activeGame, emotes, session]);
+
+  const deckCount = activeGame?.remainingDeck.length || 0;
+  const discardPile = activeGame?.discardPile || [];
+  
+  const rawTurn = activeGame?.turnIndex || 0;
+  // Calculate UI turn based on rotation
+  const myRealIndex = activeGame?.players.findIndex(p => p.id === session?.user?.id) ?? 0;
+  const turn = activeGame ? (rawTurn - myRealIndex + activeGame.players.length) % activeGame.players.length : 0;
+
+  const direction = activeGame?.direction || 1;
+  const currentColor = activeGame?.currentColor || 'Vermelho';
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
   
@@ -64,9 +94,18 @@ const GameView: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Sync Timer with server update
+  useEffect(() => {
+      if (activeGame?.lastUpdate) {
+          setTimeLeft(turnTimeLimit);
+      }
+  }, [activeGame?.lastUpdate, turnTimeLimit]);
+
   const triggerKingCommentary = async (eventContext: string) => {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      const apiKey = ((import.meta as any).env?.VITE_GEMINI_API_KEY as string) || "";
+      if (!apiKey) return;
+      const ai = new GoogleGenAI({ apiKey });
       const prompt = `Você é o Rei Narrador de uma arena real. Comente brevemente: "${eventContext}". Use 2 ou 3 palavras épicas e medievais. Sem aspas.`;
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -86,32 +125,6 @@ const GameView: React.FC = () => {
 
   useEffect(() => {
     sounds.startBGM();
-    if (!profile) return;
-    const fullDeck = createDeck(profile.activeDeck);
-    const botCount = activeRoom ? (activeRoom.maxPlayers - 1) : (isBossBattle ? 1 : arena.bots);
-    const initialPlayers: any[] = [{ id: 'player', name: 'Você', isBot: false, cards: [], avatar: '👑' }];
-    
-    const initialBotHandSize = currentArenaIndex === 0 ? 4 : 7;
-
-    if (isRanked && selectedOpponent) {
-      initialPlayers.push({ id: selectedOpponent.id, name: selectedOpponent.name, isBot: true, cards: [], avatar: selectedOpponent.avatar });
-    } else {
-      for (let i = 0; i < botCount; i++) {
-        initialPlayers.push({ id: `bot-${i}`, name: isBossBattle ? 'Mestre' : `Rival ${i + 1}`, isBot: true, cards: [], avatar: isBossBattle ? '👹' : '🤖' });
-      }
-    }
-
-    const dealtPlayers = initialPlayers.map((p, idx) => ({ 
-      ...p, 
-      cards: fullDeck.splice(0, idx === 0 ? 7 : initialBotHandSize) 
-    }));
-    
-    const firstCard = fullDeck.pop()!;
-    setDeck(fullDeck);
-    setDiscardPile([firstCard]);
-    setCurrentColor(firstCard.color === 'Especial' ? getRandomColor() : firstCard.color);
-    setPlayers(dealtPlayers);
-
     return () => {
       sounds.stopBGM();
       if (commentaryTimeoutRef.current) clearTimeout(commentaryTimeoutRef.current);
@@ -119,117 +132,103 @@ const GameView: React.FC = () => {
   }, []);
 
   const sendEmote = (emote: string, playerIdx: number) => {
-    setPlayers(prev => prev.map((p, i) => i === playerIdx ? { ...p, emote, emoteTime: Date.now() } : p));
+    const p = players[playerIdx];
+    if (!p) return;
+    setEmotes(prev => ({ ...prev, [p.id]: { text: emote, time: Date.now() } }));
     setTimeout(() => {
-      setPlayers(prev => prev.map((p, i) => i === playerIdx && p.emote === emote ? { ...p, emote: undefined } : p));
+      setEmotes(prev => {
+        const newEmotes = { ...prev };
+        delete newEmotes[p.id];
+        return newEmotes;
+      });
     }, 3000);
+    
+    // Send to social/store if needed, but for now local visual is fine for bots, 
+    // for real players we might need a store action "sendEmote"
+    if (!p.isBot) {
+        // TODO: Sync emote to server
+    }
   };
 
-  const nextTurn = useCallback((skipCount = 1) => {
-    setPlayers(currentPlayers => {
-      if (currentPlayers.length === 0) return currentPlayers;
-      
-      let finalDirection = direction;
-      if (currentArenaIndex === 6 && Math.random() < 0.15) {
-        finalDirection *= -1;
-        setDirection(finalDirection);
-        triggerKingCommentary("Destino Trocado!");
-      }
+  const nextTurn = useCallback(() => {
+     // Managed by store subscription
+     setSelectedCardsIds([]);
+     setUnoDeclared(false);
+     
+     if (rageEffect) {
+        setTimeLeft(3); 
+        setRageEffect(false);
+     } else {
+        setTimeLeft(turnTimeLimit);
+     }
+  }, [turnTimeLimit, rageEffect]);
 
-      setTurn(prev => (prev + (skipCount * finalDirection) + currentPlayers.length) % currentPlayers.length);
-      return currentPlayers;
-    });
-    setSelectedCardsIds([]);
-    setUnoDeclared(false);
+  const handleDrawCard = useCallback((playerIndex: number, count = 1) => {
+    const p = players[playerIndex];
+    if (!p) return;
     
-    if (rageEffect) {
-       setTimeLeft(3); 
-       setRageEffect(false);
-    } else {
-       setTimeLeft(turnTimeLimit);
-    }
-  }, [direction, turnTimeLimit, currentArenaIndex, rageEffect]);
-
-  const drawCard = useCallback((playerIndex: number, count = 1) => {
-    let cardsToDraw: Card[] = [];
     sounds.playCardPlay();
     if (playerIndex === 0) triggerKingCommentary("Reforço Real!");
     
-    setDeck(prevDeck => {
-      const newDeck = [...prevDeck];
-      if (newDeck.length < count) {
-        const reshuffled = createDeck(profile?.activeDeck);
-        cardsToDraw = [...newDeck, ...reshuffled.splice(0, count - newDeck.length)];
-        return reshuffled;
-      }
-      cardsToDraw = newDeck.splice(0, count);
-      return newDeck;
-    });
-    setPlayers(prevPlayers => prevPlayers.map((p, idx) => idx === playerIndex ? { ...p, cards: [...p.cards, ...cardsToDraw] } : p));
-  }, [profile]);
+    // Call store
+    drawCard(p.id, count);
+  }, [players, drawCard]);
 
-  const executePlay = useCallback((playerIndex: number, cards: Card[], chosenColor?: CardColor) => {
+  const executePlay = useCallback(async (playerIndex: number, cards: Card[], chosenColor?: CardColor) => {
+    const p = players[playerIndex];
+    if (!p) return;
+    
     setIsProcessing(true);
     sounds.playCardPlay();
     
-    let cardsToExecute = [...cards];
-    const lastCard = cardsToExecute[cardsToExecute.length - 1];
+    const lastCard = cards[cards.length - 1];
 
-    setPlayers(prevPlayers => {
-      const updatedPlayers = prevPlayers.map((p, idx) => {
-        if (idx === playerIndex) {
-          const newHand = p.cards.filter(c => !cards.some(played => played.instanceId === c.instanceId));
-          if (playerIndex === 0 && newHand.length === 1 && !unoDeclared) {
-             setTimeout(() => { drawCard(0, 2); triggerKingCommentary("Esqueceu o Grito!"); }, 400);
-          }
-          return { ...p, cards: newHand };
-        }
-        return p;
-      });
+    if (playerIndex === 0 && p.cards.length - cards.length === 1 && !unoDeclared) {
+       setTimeout(() => { handleDrawCard(0, 2); triggerKingCommentary("Esqueceu o Grito!"); }, 400);
+    }
 
-      let skip = 1;
-      let colorToSet: CardColor = lastCard.color === 'Especial' ? (chosenColor || getRandomColor()) : lastCard.color;
+    let colorToSet: CardColor = lastCard.color === 'Especial' ? (chosenColor || getRandomColor()) : lastCard.color;
 
-      if (lastCard.type === CardType.SKIP) { 
+    if (lastCard.type === CardType.SKIP) { 
         sounds.playFreeze(); 
         setFreezeOverlay(true); 
         setTimeout(() => setFreezeOverlay(false), 800); 
-        skip = 2; 
-      }
-      else if (lastCard.type === CardType.REVERSE) { 
-        setDirection(prev => prev * -1); 
-      }
-      else if (lastCard.type === CardType.DRAW4) { 
-        const vIdx = (playerIndex + (1 * direction) + updatedPlayers.length) % updatedPlayers.length; 
-        setTimeout(() => drawCard(vIdx, 4), 500); 
+    }
+    else if (lastCard.type === CardType.REVERSE) { 
+        // Visual only
+    }
+    else if (lastCard.type === CardType.DRAW4) { 
         setRageEffect(true); 
-        skip = 2; 
         triggerKingCommentary("Pânico Total!");
-      }
-      else if (lastCard.type === CardType.DRAW2) {
-        const vIdx = (playerIndex + (1 * direction) + updatedPlayers.length) % updatedPlayers.length; 
-        setTimeout(() => drawCard(vIdx, 2), 500); 
-      }
+    }
 
-      setDiscardPile(prev => [...prev, ...cardsToExecute]);
-      setCurrentColor(colorToSet);
+    // Call Store
+    await playCard(cards, colorToSet, p.id);
 
-      if (updatedPlayers[playerIndex].cards.length === 0) {
-        setTimeout(() => {
-           if (profile) setLastRewards({ gold: isBossBattle ? 1000 : 200, gems: isBossBattle ? 50 : 5, bonus: 0, chestAcquired: true });
-           setGameStatus(playerIndex === 0 ? GameStatus.VICTORY : GameStatus.DEFEAT);
-           updateTrophies(playerIndex === 0 ? 30 : -15);
-        }, 500);
-      } else {
-        setTimeout(() => { setIsProcessing(false); nextTurn(skip); }, 600);
-      }
-      return updatedPlayers;
-    });
-  }, [profile, isBossBattle, direction, unoDeclared, drawCard, nextTurn, setGameStatus, updateTrophies, discardPile]);
+    // Check Win (Store handles it, but we can do visual feedback)
+    if (p.cards.length === cards.length) {
+       setTimeout(() => {
+          if (profile && playerIndex === 0) setLastRewards({ gold: isBossBattle ? 1000 : 200, gems: isBossBattle ? 50 : 5, bonus: 0, chestAcquired: true });
+          if (playerIndex === 0) {
+             setGameStatus(GameStatus.VICTORY);
+             updateTrophies(30);
+          } else if (p.id === session?.user?.id) {
+             setGameStatus(GameStatus.DEFEAT);
+             updateTrophies(-15);
+          }
+       }, 500);
+    } else {
+       setTimeout(() => { setIsProcessing(false); nextTurn(); }, 600);
+    }
+  }, [players, profile, isBossBattle, unoDeclared, handleDrawCard, nextTurn, setGameStatus, updateTrophies, playCard, session]);
 
   useEffect(() => {
-    if (players[turn]?.isBot && !isProcessing && !showColorPicker && discardPile.length > 0) {
-      const moves = getBotMove(players[turn].cards, discardPile[discardPile.length - 1], currentColor);
+    // Bot Logic: Only run if I am the creator and it's a bot's turn
+    const isCreator = activeRoom?.creatorId === session?.user?.id;
+    const currentPlayer = players[turn];
+    
+    if (isCreator && currentPlayer?.isBot && !isProcessing && !showColorPicker && discardPile.length > 0) {
+      const moves = getBotMove(currentPlayer.cards, discardPile[discardPile.length - 1], currentColor);
       
       if (Math.random() < 0.1) {
         const botEmotes = ['😂', '😠', '👍', '😭'];
@@ -238,20 +237,20 @@ const GameView: React.FC = () => {
 
       setTimeout(() => {
         if (moves.length > 0) executePlay(turn, moves);
-        else { drawCard(turn, 1); nextTurn(); }
+        else { handleDrawCard(turn, 1); nextTurn(); }
       }, 1200);
     }
-  }, [turn, isProcessing, currentColor, discardPile, players, showColorPicker, executePlay, drawCard, nextTurn]);
+  }, [turn, isProcessing, currentColor, discardPile, players, showColorPicker, executePlay, handleDrawCard, nextTurn, activeRoom, session]);
 
   useEffect(() => {
     if (timeLeft > 0 && !isProcessing && gameStatus === GameStatus.BATTLE) {
       const timer = setTimeout(() => setTimeLeft(prev => prev - 1), 1000);
       return () => clearTimeout(timer);
     } else if (timeLeft === 0 && turn === 0) {
-      drawCard(0, 1);
+      handleDrawCard(0, 1);
       nextTurn();
     }
-  }, [timeLeft, turn, isProcessing, gameStatus, drawCard, nextTurn]);
+  }, [timeLeft, turn, isProcessing, gameStatus, handleDrawCard, nextTurn]);
 
   const getCardPosition = (index: number, total: number, isSelected: boolean) => {
     const mid = (total - 1) / 2;
@@ -286,7 +285,7 @@ const GameView: React.FC = () => {
       </div>
 
       <div className="w-full flex justify-between items-start px-6 pt-8 z-[300] shrink-0 landscape:pt-4">
-        <button onClick={() => setGameStatus(GameStatus.MENU)} className="w-12 h-12 bg-black/70 rounded-2xl border-2 border-white/10 flex items-center justify-center text-xl shadow-2xl active:scale-90 transition-transform">🚪</button>
+        <button onClick={() => { sounds.playClick(); quitGame(); }} className="w-12 h-12 bg-black/70 rounded-2xl border-2 border-white/10 flex items-center justify-center text-xl shadow-2xl active:scale-90 transition-transform">🚪</button>
         <div className="flex gap-6 sm:gap-12">
           {players.slice(1).map((bot, idx) => (
             <div key={bot.id} className={`flex flex-col items-center transition-all relative ${turn === idx + 1 ? 'scale-110' : 'opacity-40 grayscale'}`}>
@@ -323,7 +322,7 @@ const GameView: React.FC = () => {
 
       <div className="flex-1 w-full flex items-center justify-center relative z-10 scale-90 sm:scale-100 landscape:scale-75">
          <div className="flex items-center gap-12 sm:gap-24">
-            <div onClick={() => turn === 0 && !isProcessing && drawCard(0, 1) && nextTurn()} className={`relative group ${turn === 0 ? 'cursor-pointer hover:scale-105 active:scale-95' : 'opacity-40 pointer-events-none'} transition-all`}>
+            <div onClick={() => turn === 0 && !isProcessing && handleDrawCard(0, 1) && nextTurn()} className={`relative group ${turn === 0 ? 'cursor-pointer hover:scale-105 active:scale-95' : 'opacity-40 pointer-events-none'} transition-all`}>
                <ClashCard card={{} as any} hidden size="md" />
                {turn === 0 && <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-blue-600 px-4 py-1 rounded-full text-[10px] font-black animate-bounce text-white shadow-lg">COMPRAR</div>}
             </div>

@@ -4,18 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Clash Uno Royale</title>
-    <!-- Tailwind JIT -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind via Vite plugin: CSS import em index.tsx -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
-    <script>
-        // Polyfill robusto para process.env
-        window.process = window.process || {};
-        window.process.env = window.process.env || {};
-        // Não sobrescreve se já existir uma chave injetada pelo ambiente
-        if (typeof window.process.env.API_KEY === 'undefined') {
-            window.process.env.API_KEY = "";
-        }
-    </script>
     <style>
         body {
             font-family: 'Roboto', sans-serif;
@@ -69,22 +59,9 @@
             animation: kingWhisper 3.5s forwards cubic-bezier(0.16, 1, 0.3, 1);
         }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react-dom": "https://esm.sh/react-dom@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "zustand": "https://esm.sh/zustand@^5.0.9",
-    "zustand/": "https://esm.sh/zustand@^5.0.9/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.4"
-  }
-}
-</script>
 </head>
 <body>
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
 </body>
 </html>

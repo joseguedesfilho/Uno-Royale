@@ -15,7 +15,9 @@ const LobbyView: React.FC = () => {
     fetchRooms,
     createRoom,
     updateRoom,
-    joinRoom
+    joinRoom,
+    subscribeToLobby,
+    unsubscribeFromLobby
   } = useGameStore();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -28,9 +30,13 @@ const LobbyView: React.FC = () => {
 
   useEffect(() => {
     fetchRooms();
-    const interval = setInterval(fetchRooms, 10000);
-    return () => clearInterval(interval);
-  }, [fetchRooms]);
+    subscribeToLobby();
+    const interval = setInterval(fetchRooms, 10000); // Keep polling as backup
+    return () => {
+      clearInterval(interval);
+      unsubscribeFromLobby();
+    };
+  }, [fetchRooms, subscribeToLobby, unsubscribeFromLobby]);
 
   useEffect(() => {
      if (activeRoom && gameStatus === GameStatus.LOBBY) {
@@ -46,7 +52,9 @@ const LobbyView: React.FC = () => {
   const generateArenaName = async () => {
     setIsGeneratingName(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = ((import.meta as any).env?.VITE_GEMINI_API_KEY as string) || "";
+      if (!apiKey) return;
+      const ai = new GoogleGenAI({ apiKey });
       const prompt = "Gere 3 nomes épicos de arenas para um jogo de cartas Royale. Retorne apenas os nomes em um array JSON: ['nome1', 'nome2', 'nome3'].";
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',

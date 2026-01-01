@@ -109,6 +109,26 @@ export interface UserProfile {
   profileBanner?: string;
 }
 
+export interface ActiveGameState {
+  deckCount: number;
+  remainingDeck: Card[];
+  discardPile: Card[];
+  players: {
+    id: string;
+    name: string;
+    avatar: string;
+    cardCount: number;
+    isBot: boolean;
+  }[];
+  hands: Record<string, Card[]>;
+  turnIndex: number;
+  direction: number;
+  currentColor: CardColor;
+  lastUpdate: number;
+  status: 'Em Jogo' | 'Finalizado';
+  winnerId?: string;
+}
+
 export enum GameStatus {
   MENU = 'MENU',
   LOADING = 'CARREGANDO',
