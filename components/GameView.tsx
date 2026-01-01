@@ -271,11 +271,11 @@ const GameView: React.FC = () => {
       const lift = isLandscape ? 180 : 140;
       return { transform: `translateY(-${lift}px) scale(1.12) rotate(0deg)`, zIndex: 1000 };
     }
-    const baseSpread = isLandscape ? 40 : 28;
+    const baseSpread = isLandscape ? 40 : 24;
     const squeezingFactor = total > 7 ? (8 / total) : 1;
     const dynamicSpread = baseSpread * squeezingFactor;
     const rotation = diff * (isLandscape ? 20 : 12) / (mid || 1);
-    const translateY = Math.pow(Math.abs(diff), 2) * (isLandscape ? 1.8 : 1.2);
+    const translateY = -Math.pow(Math.abs(diff), 2) * (isLandscape ? 1.6 : 1.1);
     const translateX = diff * dynamicSpread;
     return {
       transform: `translateX(${translateX}px) translateY(${translateY}px) rotate(${rotation}deg)`,
